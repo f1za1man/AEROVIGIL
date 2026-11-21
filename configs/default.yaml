@@ -1,0 +1,16 @@
+project:
+  name: "AEROVIGIL"
+  version: "0.1.0"
+  description: "UAV Navigation Integrity Monitoring and GPS Spoofing Detection"
+
+environment:
+  random_seed: 42
+  python_version: "3.11"
+
+data:
+  raw_directory: "data/raw"
+  interim_directory: "data/interim"
+  processed_directory: "data/processed"
+
+logging:
+  level: "INFO"

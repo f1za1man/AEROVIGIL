@@ -1,0 +1,56 @@
+# AEROVIGIL Module 04 - synthetic GPS-spoofing attack generator.
+# All attacks are injected into LOGS ONLY. No radio signal is ever generated.
+# One command regenerates everything:
+#   python src\aerovigil\attacks\generate_attacks.py
+
+paths:
+  preprocessing_config: configs/preprocessing/preprocessing.yaml
+  clean_flights_dir: data/processed/module03/cleaned
+  cleaning_report: data/processed/module03/cleaning_report.csv
+  flight_splits: data/interim/module03/flight_splits.csv
+  output_dir: data/processed/module04
+
+columns:
+  attack_enabled: attack_enabled # duplicate of attack_label in the dataset
+  gps_speed: velocity            # horizontal GPS speed = hypot(velocity_north, velocity_east)
+
+random_seed: 42
+draws_per_type: 1                     # attacked copies per clean flight and type
+probability_consistent_velocity: 0.5  # 0.5 = half naive, half coherent spoofers
+enabled_attack_types:
+  - abrupt_jump
+  - constant_offset
+  - linear_drift
+  - exponential_ramp
+  - low_amplitude_wander
+
+timing:                               # all times in seconds since flight start
+  min_start_s: 10.0                   # leaves room for feature/window warm-up
+  min_duration_s: 10.0
+  start_fraction_range: [0.20, 0.60]  # attack starts at 20-60% of the flight
+  duration_s_range: [20.0, 90.0]      # clipped to the end of the flight
+
+# Magnitudes, rates and amplitudes are sampled log-uniformly; the others uniformly.
+attack_types:
+  abrupt_jump:
+    magnitude_m_range: [20.0, 500.0]
+  constant_offset:
+    magnitude_m_range: [5.0, 100.0]
+    ramp_seconds_range: [1.0, 5.0]
+  linear_drift:
+    drift_rate_mps_range: [0.05, 5.0]
+  exponential_ramp:
+    initial_rate_mps_range: [0.05, 1.0]
+    time_constant_s_range: [15.0, 60.0]
+    max_offset_m: 500.0
+  low_amplitude_wander:
+    amplitude_m_range: [1.0, 10.0]
+    period_s_range: [8.0, 60.0]
+
+# Controlled drift-rate sweep, used later for the Stealth Frontier (Modules 8-9).
+sweep:
+  enabled: true
+  splits: [test]
+  drift_rates_mps: [0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0]
+  start_fraction: 0.25
+  velocity_mode: consistent           # the strongest (most coherent) attacker

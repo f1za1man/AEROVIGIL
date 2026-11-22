@@ -1,4 +1,4 @@
--e git+https://github.com/f1za1man/AEROVIGIL.git@119ecd184ec725b694be69dcdbe1c0732b3ae82e#egg=aerovigil
+-e git+https://github.com/f1za1man/AEROVIGIL.git@e90b5d7f4b110cc6eef083915202894bb1eadaf9#egg=aerovigil
 anyio==4.16.0
 argon2-cffi==25.1.0
 argon2-cffi-bindings==26.2.0

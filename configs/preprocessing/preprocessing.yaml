@@ -1,0 +1,55 @@
+
+dataset:
+  input_file: data/processed/aerovigil_flights.csv
+  flight_id_column: "flight_id"
+  timestamp_column: "time_usec"
+  timestamp_unit: "microseconds"
+
+labels:
+  attack_column: "attack_label"
+  normal_value: 0
+  attack_value: 1
+
+sensors:
+  gps:
+    latitude: "latitude_deg"
+    longitude: "longitude_deg"
+    altitude: "altitude"
+    velocity_north: "velocity_north"
+    velocity_east: "velocity_east"
+    velocity_down: null
+    velocity_up: "velocity_up"
+    course: null
+
+  imu:
+    acceleration_x: "linear_acceleration_x"
+    acceleration_y: "linear_acceleration_y"
+    acceleration_z: "linear_acceleration_z"
+    gyro_x: "angular_velocity_x"
+    gyro_y: "angular_velocity_y"
+    gyro_z: "angular_velocity_z"
+    attitude_roll: null
+    attitude_pitch: null
+    attitude_yaw: null
+
+  barometer:
+    altitude: "pressure_altitude"
+
+  magnetometer:
+    magnetic_x: "magnetic_field_x"
+    magnetic_y: "magnetic_field_y"
+    magnetic_z: "magnetic_field_z"
+    heading: null
+
+processing:
+  resampling_enabled: false
+  target_frequency_hz: null
+  maximum_interpolation_gap_seconds: null
+  window_duration_seconds: 5
+  window_overlap: 0.5
+  random_seed: 42
+
+splitting:
+  train_fraction: 0.70
+  validation_fraction: 0.15
+  test_fraction: 0.15

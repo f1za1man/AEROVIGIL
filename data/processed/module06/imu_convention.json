@@ -1,0 +1,68 @@
+{
+  "convention": {
+    "rotation": "body_to_world",
+    "gravity": "specific_force",
+    "frame": "enu"
+  },
+  "accepted": true,
+  "scores": [
+    {
+      "convention": "body_to_world/specific_force/enu",
+      "r2_horizontal": 0.9894,
+      "r2_vertical": -0.5712,
+      "mean_vertical_accel": -0.0017,
+      "score": 0.4182
+    },
+    {
+      "convention": "body_to_world/linear/enu",
+      "r2_horizontal": 0.9894,
+      "r2_vertical": -1.0,
+      "mean_vertical_accel": 9.8049,
+      "score": -0.0106
+    },
+    {
+      "convention": "body_to_world/specific_force/ned",
+      "r2_horizontal": -1.0537,
+      "r2_vertical": -1.0,
+      "mean_vertical_accel": -19.6116,
+      "score": -2.0537
+    },
+    {
+      "convention": "body_to_world/linear/ned",
+      "r2_horizontal": -1.0537,
+      "r2_vertical": -1.0,
+      "mean_vertical_accel": -9.8049,
+      "score": -2.0537
+    },
+    {
+      "convention": "world_to_body/specific_force/ned",
+      "r2_horizontal": -5.7865,
+      "r2_vertical": -1.0,
+      "mean_vertical_accel": -19.2518,
+      "score": -6.7865
+    },
+    {
+      "convention": "world_to_body/linear/ned",
+      "r2_horizontal": -5.7865,
+      "r2_vertical": -1.0,
+      "mean_vertical_accel": -9.4452,
+      "score": -6.7865
+    },
+    {
+      "convention": "world_to_body/specific_force/enu",
+      "r2_horizontal": -5.9019,
+      "r2_vertical": -1.0,
+      "mean_vertical_accel": -0.3615,
+      "score": -6.9019
+    },
+    {
+      "convention": "world_to_body/linear/enu",
+      "r2_horizontal": -5.9019,
+      "r2_vertical": -1.0,
+      "mean_vertical_accel": 9.4452,
+      "score": -6.9019
+    }
+  ],
+  "magnetometer_circular_std_deg": 95.96218630553442,
+  "gps_repeated_row_fraction": 0.6882386251158372
+}

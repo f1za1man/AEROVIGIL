@@ -4,6 +4,7 @@ A window is `window_s` seconds long and moves by `hop_s`. Windows that span a
 log gap, or that have too little valid data, are dropped. Every window becomes
 one row of summary statistics, which is what the classical models need.
 """
+
 import warnings
 
 import numpy as np
@@ -21,7 +22,9 @@ def window_bounds(t, window_s, hop_s):
     last_start = t[-1] - window_s
     if last_start < t[0]:
         return np.empty(0), np.empty(0, dtype=int), np.empty(0, dtype=int)
-    starts = t[0] + hop_s * np.arange(int(np.floor((last_start - t[0]) / hop_s + 1e-9)) + 1)
+    starts = t[0] + hop_s * np.arange(
+        int(np.floor((last_start - t[0]) / hop_s + 1e-9)) + 1
+    )
     a = np.searchsorted(t, starts, side="left")
     b = np.searchsorted(t, starts + window_s, side="left")
     return starts, a, b
@@ -46,11 +49,21 @@ def _summarise(x, t_win):
     dt = t_win[i_last] - t_win[i_first]
     with np.errstate(divide="ignore", invalid="ignore"):
         delta = np.where(dt > 0, (last - first) / dt, np.nan)
-    return np.stack([mean, std, mn, mx, last, delta], axis=1).reshape(-1)  # feature-major
+    return np.stack([mean, std, mn, mx, last, delta], axis=1).reshape(
+        -1
+    )  # feature-major
 
 
-def summarise_flight(feat, t_s, labels, after_gap, window_s, hop_s,
-                     min_valid_fraction=0.5, min_span_fraction=0.9):
+def summarise_flight(
+    feat,
+    t_s,
+    labels,
+    after_gap,
+    window_s,
+    hop_s,
+    min_valid_fraction=0.5,
+    min_span_fraction=0.9,
+):
     """Summarise one flight.
 
     feat      (n_rows, n_features) array, NaN allowed
@@ -74,7 +87,7 @@ def summarise_flight(feat, t_s, labels, after_gap, window_s, hop_s,
         if i1 - i0 < 2:
             dropped["too_few_rows"] += 1
             continue
-        if after_gap[i0 + 1:i1].any():
+        if after_gap[i0 + 1 : i1].any():
             dropped["spans_gap"] += 1
             continue
         if t_s[i1 - 1] - t_s[i0] < min_span_fraction * window_s:
@@ -85,11 +98,15 @@ def summarise_flight(feat, t_s, labels, after_gap, window_s, hop_s,
             dropped["too_many_nan"] += 1
             continue
         rows.append(_summarise(x, t_s[i0:i1]))
-        meta.append({
-            "window_start_s": float(ws), "window_end_s": float(ws + window_s),
-            "last_row": int(i1 - 1), "n_rows": int(i1 - i0),
-            "attack_fraction": float(labels[i0:i1].mean()),
-        })
+        meta.append(
+            {
+                "window_start_s": float(ws),
+                "window_end_s": float(ws + window_s),
+                "last_row": int(i1 - 1),
+                "n_rows": int(i1 - i0),
+                "attack_fraction": float(labels[i0:i1].mean()),
+            }
+        )
     stats = np.vstack(rows) if rows else np.empty((0, feat.shape[1] * len(STATS)))
     return stats, meta, dropped
 

@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -22,7 +23,7 @@ SEED = 42
 def load_split(name):
     d = np.load(WIN_DIR / f"windows_{name}.npz", allow_pickle=False)
     X = d["X"]
-    means = X.mean(axis=1, dtype="float64")       # (windows, features)
+    means = X.mean(axis=1, dtype="float64")  # (windows, features)
     frac = d["attack_fraction"].astype("float64")
     names = [str(s) for s in d["feature_names"]]
     del X
@@ -62,8 +63,10 @@ def main():
     print("\nTOP LOADINGS")
     for pc in range(2):
         order = np.argsort(-np.abs(pca.components_[pc]))[:5]
-        print(f"  PC{pc + 1}: " + ", ".join(
-            f"{names[i]} ({pca.components_[pc][i]:+.2f})" for i in order))
+        print(
+            f"  PC{pc + 1}: "
+            + ", ".join(f"{names[i]} ({pca.components_[pc][i]:+.2f})" for i in order)
+        )
 
     # ---- PCA scatter plots ---------------------------------------------------
     colours = {"normal": "#1f77b4", "mixed": "#ff7f0e", "attacked": "#d62728"}
@@ -79,15 +82,22 @@ def main():
         fig, ax = plt.subplots(figsize=(7.5, 6))
         for label in ("normal", "mixed", "attacked"):
             sel = order[grp[order] == label]
-            ax.scatter(sc[sel, 0], sc[sel, 1], s=7, alpha=0.45,
-                       c=colours[label], label=f"{label} ({(grp == label).sum():,})",
-                       linewidths=0)
+            ax.scatter(
+                sc[sel, 0],
+                sc[sel, 1],
+                s=7,
+                alpha=0.45,
+                c=colours[label],
+                label=f"{label} ({(grp == label).sum():,})",
+                linewidths=0,
+            )
         ax.set_xlim(lo[0] - pad[0], hi[0] + pad[0])
         ax.set_ylim(lo[1] - pad[1], hi[1] + pad[1])
         ax.set_xlabel(f"PC1 ({ev[0] * 100:.1f}% variance)")
         ax.set_ylabel(f"PC2 ({ev[1] * 100:.1f}% variance)")
-        ax.set_title(f"PCA of window-mean features - {s} "
-                     f"(PCA fitted on training only)")
+        ax.set_title(
+            f"PCA of window-mean features - {s} " f"(PCA fitted on training only)"
+        )
         ax.legend(markerscale=3, title="Attack content of window")
         ax.grid(alpha=0.25)
         fig.tight_layout()
@@ -97,8 +107,15 @@ def main():
     # ---- feature correlation (training windows) -----------------------------
     corr = pd.DataFrame(Xtr, columns=names).corr()
     fig, ax = plt.subplots(figsize=(12, 10))
-    sns.heatmap(corr, cmap="coolwarm", vmin=-1, vmax=1, square=True,
-                cbar_kws={"label": "Pearson correlation"}, ax=ax)
+    sns.heatmap(
+        corr,
+        cmap="coolwarm",
+        vmin=-1,
+        vmax=1,
+        square=True,
+        cbar_kws={"label": "Pearson correlation"},
+        ax=ax,
+    )
     ax.set_title("Feature correlation (training windows, window-mean features)")
     plt.setp(ax.get_xticklabels(), rotation=90, fontsize=8)
     plt.setp(ax.get_yticklabels(), fontsize=8)
@@ -164,19 +181,23 @@ def main():
     with (OUT_DIR / "pca_summary.json").open("w", encoding="utf-8") as f:
         json.dump(summary, f, indent=2)
 
-    expected = ["pca_train.png", "pca_validation.png", "pca_test.png",
-                "feature_correlation.png", "missing_values.png",
-                "sampling_intervals.png"]
-    leaked = [n for n in names
-              if any(w in n.lower() for w in ("attack", "label", "flight"))]
+    expected = [
+        "pca_train.png",
+        "pca_validation.png",
+        "pca_test.png",
+        "feature_correlation.png",
+        "missing_values.png",
+        "sampling_intervals.png",
+    ]
+    leaked = [
+        n for n in names if any(w in n.lower() for w in ("attack", "label", "flight"))
+    ]
     checks = {
-        "PCA fitted on training windows only (11,579)":
-            pca.n_samples_ == data["train"][0].shape[0],
-        "No NaN in PCA input":
-            all(np.isfinite(data[s][0]).all() for s in SPLITS),
+        "PCA fitted on training windows only (11,579)": pca.n_samples_
+        == data["train"][0].shape[0],
+        "No NaN in PCA input": all(np.isfinite(data[s][0]).all() for s in SPLITS),
         "No label/ID column in PCA input": not leaked,
-        "All six figures created":
-            all((FIG_DIR / n).exists() for n in expected),
+        "All six figures created": all((FIG_DIR / n).exists() for n in expected),
         "Explained variance recorded": (OUT_DIR / "pca_summary.json").exists(),
     }
     print("\nACCEPTANCE CHECKS")

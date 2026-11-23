@@ -31,8 +31,10 @@ def test_no_missing_flight_ids(paths):
 def test_split_flights_do_not_overlap(paths):
     s = pd.read_csv(paths["splits"])
     assert s["flight_id"].is_unique
-    sets = {k: set(s.loc[s["split"] == k, "flight_id"])
-            for k in ("train", "validation", "test")}
+    sets = {
+        k: set(s.loc[s["split"] == k, "flight_id"])
+        for k in ("train", "validation", "test")
+    }
     assert not (sets["train"] & sets["validation"])
     assert not (sets["train"] & sets["test"])
     assert not (sets["validation"] & sets["test"])
@@ -45,9 +47,12 @@ def test_feature_columns_exclude_labels(paths):
         assert not any(w in name.lower() for w in LABEL_WORDS), name
     first = sorted(paths["normalized"].glob("*.parquet"))[0]
     cols = pd.read_parquet(first).columns
-    feature_cols = [c for c in cols if c not in (
-        "flight_id", "mission_type", "time_usec", "attack_label",
-        "after_gap")]
+    feature_cols = [
+        c
+        for c in cols
+        if c
+        not in ("flight_id", "mission_type", "time_usec", "attack_label", "after_gap")
+    ]
     assert feature_cols == params["feature_order"]
 
 
@@ -71,10 +76,12 @@ def test_normalization_fitted_on_training_flights_only(paths):
         x = g[names].to_numpy(dtype="float64")
         n += (~np.isnan(x)).sum(axis=0)
         s += np.nansum(x, axis=0)
-        ss += np.nansum(x ** 2, axis=0)
+        ss += np.nansum(x**2, axis=0)
     mean = s / n
-    std = np.sqrt(np.maximum(ss / n - mean ** 2, 0))
+    std = np.sqrt(np.maximum(ss / n - mean**2, 0))
     np.testing.assert_allclose(
-        mean, [params["mean"][k] for k in names], rtol=1e-4, atol=1e-6)
+        mean, [params["mean"][k] for k in names], rtol=1e-4, atol=1e-6
+    )
     np.testing.assert_allclose(
-        std, [params["std"][k] for k in names], rtol=1e-3, atol=1e-6)
+        std, [params["std"][k] for k in names], rtol=1e-3, atol=1e-6
+    )

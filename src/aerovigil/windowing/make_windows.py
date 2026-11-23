@@ -12,11 +12,10 @@ WIN_DIR = OUT_DIR / "windows"
 SPLIT_FILE = ROOT / "data" / "interim" / "module03" / "flight_splits.csv"
 CLEAN_REPORT = OUT_DIR / "cleaning_report.csv"
 
-TARGET_HZ = 125            # fixed output grid for every window
+TARGET_HZ = 125  # fixed output grid for every window
 GRID_DT = 1.0 / TARGET_HZ
-MAX_STEP_S = 0.05          # a raw step larger than this counts as a dropout
-ID_COLUMNS = ["flight_id", "mission_type", "time_usec",
-              "attack_label", "after_gap"]
+MAX_STEP_S = 0.05  # a raw step larger than this counts as a dropout
+ID_COLUMNS = ["flight_id", "mission_type", "time_usec", "attack_label", "after_gap"]
 SPLITS = ("train", "validation", "test")
 
 
@@ -27,26 +26,26 @@ def main():
     overlap = float(cfg["processing"]["window_overlap"])
     attack_value = cfg["labels"]["attack_value"]
 
-    N = int(round(seconds * TARGET_HZ))          # 625 samples
-    STEP_S = seconds * (1 - overlap)             # 2.5 s
-    GRID = np.arange(N) * GRID_DT                # 0 .. 4.992 s
+    N = int(round(seconds * TARGET_HZ))  # 625 samples
+    STEP_S = seconds * (1 - overlap)  # 2.5 s
+    GRID = np.arange(N) * GRID_DT  # 0 .. 4.992 s
 
     splits = pd.read_csv(SPLIT_FILE).set_index("flight_id")["split"]
     clean = pd.read_csv(CLEAN_REPORT).set_index("flight_id")
     files = sorted(NORM_DIR.glob("*.parquet"))
     WIN_DIR.mkdir(parents=True, exist_ok=True)
 
-    features = [c for c in pd.read_parquet(files[0]).columns
-                if c not in ID_COLUMNS]
+    features = [c for c in pd.read_parquet(files[0]).columns if c not in ID_COLUMNS]
     k = len(features)
 
     print("=" * 65)
     print("AEROVIGIL - TEMPORAL WINDOW GENERATION")
     print("=" * 65)
-    print(f"Window: {seconds:g} s | step {STEP_S:g} s | "
-          f"overlap {overlap:.0%}")
-    print(f"Output grid: {N} samples @ {TARGET_HZ} Hz | "
-          f"max raw step allowed {MAX_STEP_S} s\n")
+    print(f"Window: {seconds:g} s | step {STEP_S:g} s | " f"overlap {overlap:.0%}")
+    print(
+        f"Output grid: {N} samples @ {TARGET_HZ} Hz | "
+        f"max raw step allowed {MAX_STEP_S} s\n"
+    )
 
     X = {s: [] for s in SPLITS}
     records = {s: [] for s in SPLITS}
@@ -60,7 +59,7 @@ def main():
         t_us = g["time_usec"].to_numpy(dtype="int64")
         t = (t_us - t_us[0]) * 1e-6
         rows = len(t)
-        y = (g["attack_label"].to_numpy() == attack_value)
+        y = g["attack_label"].to_numpy() == attack_value
         x = g[features].to_numpy(dtype="float32")
         mission = g["mission_type"].iloc[0]
         hz = int(round(1 / float(clean.loc[fid, "median_interval_s"])))
@@ -79,9 +78,11 @@ def main():
         i1c = np.clip(i1 - 1, 0, rows - 1)
 
         # coverage: data must exist close to both window edges
-        cover = ((i1 - i0) >= 2) \
-            & (t[i0c] - starts <= MAX_STEP_S) \
+        cover = (
+            ((i1 - i0) >= 2)
+            & (t[i0c] - starts <= MAX_STEP_S)
             & (starts + seconds - t[i1c] <= MAX_STEP_S)
+        )
 
         # no dropout inside the window
         bad = (np.diff(t) > MAX_STEP_S).astype("int64")
@@ -111,31 +112,33 @@ def main():
             for j in range(k):
                 wins[out_i, :, j] = np.interp(grid, tw, xw[:, j])
 
-            idx = np.clip(np.searchsorted(tw, grid, side="right") - 1,
-                          0, len(tw) - 1)
+            idx = np.clip(np.searchsorted(tw, grid, side="right") - 1, 0, len(tw) - 1)
             yg = y[a:b][idx]
             any_attack = bool(yg.any())
             first = int(np.argmax(yg)) if any_attack else -1
 
-            records[split].append({
-                "flight_id": fid,
-                "split": split,
-                "mission_type": mission,
-                "original_hz": hz,
-                "start_time_usec": int(t_us[0] + round(starts[w] * 1e6)),
-                "end_time_usec": int(t_us[0] + round(
-                    (starts[w] + GRID[-1]) * 1e6)),
-                "duration_s": float(GRID[-1]),
-                "raw_samples": int(b - a),
-                "max_raw_step_s": float(np.diff(tw).max()),
-                "attack_fraction": float(yg.mean()),
-                "any_attack": int(any_attack),
-                "attack_onset_in_window": int(any_attack and not yg[0]),
-                "onset_offset_s": first * GRID_DT if any_attack else np.nan,
-                "seconds_since_flight_attack_start":
-                    float(grid[-1] - t_attack_start)
-                    if not np.isnan(t_attack_start) else np.nan,
-            })
+            records[split].append(
+                {
+                    "flight_id": fid,
+                    "split": split,
+                    "mission_type": mission,
+                    "original_hz": hz,
+                    "start_time_usec": int(t_us[0] + round(starts[w] * 1e6)),
+                    "end_time_usec": int(t_us[0] + round((starts[w] + GRID[-1]) * 1e6)),
+                    "duration_s": float(GRID[-1]),
+                    "raw_samples": int(b - a),
+                    "max_raw_step_s": float(np.diff(tw).max()),
+                    "attack_fraction": float(yg.mean()),
+                    "any_attack": int(any_attack),
+                    "attack_onset_in_window": int(any_attack and not yg[0]),
+                    "onset_offset_s": first * GRID_DT if any_attack else np.nan,
+                    "seconds_since_flight_attack_start": (
+                        float(grid[-1] - t_attack_start)
+                        if not np.isnan(t_attack_start)
+                        else np.nan
+                    ),
+                }
+            )
         X[split].append(wins)
 
     # ---- write one compressed array + manifest per split -----------------
@@ -168,40 +171,46 @@ def main():
     print(f"Dropped (NaN features)   : {dropped_nan:,}")
     print(f"Windows kept             : {len(full):,}")
 
-    summ = full.groupby("split").agg(
-        windows=("window_index", "count"),
-        flights=("flight_id", "nunique"),
-        mean_attack_fraction=("attack_fraction", "mean"),
-        windows_any_attack=("any_attack", "sum"),
-        windows_with_onset=("attack_onset_in_window", "sum"),
-    ).loc[list(SPLITS)]
+    summ = (
+        full.groupby("split")
+        .agg(
+            windows=("window_index", "count"),
+            flights=("flight_id", "nunique"),
+            mean_attack_fraction=("attack_fraction", "mean"),
+            windows_any_attack=("any_attack", "sum"),
+            windows_with_onset=("attack_onset_in_window", "sum"),
+        )
+        .loc[list(SPLITS)]
+    )
     print("\n" + summ.round(3).to_string())
     print("\nArray shapes:", {s: tuple(v) for s, v in shapes.items()})
     print("\nRaw samples per window:")
     print(full["raw_samples"].describe().round(1).to_string())
-    print("\nLargest raw step inside any window (s):",
-          round(full["max_raw_step_s"].max(), 4))
+    print(
+        "\nLargest raw step inside any window (s):",
+        round(full["max_raw_step_s"].max(), 4),
+    )
 
     fl = {s: set(full.loc[full["split"] == s, "flight_id"]) for s in SPLITS}
     sp = {s: set(splits[splits == s].index) for s in SPLITS}
     checks = {
-        f"Window shape is ({N}, {k}) in every split":
-            all(v[1:] == (N, k) for v in shapes.values()),
-        "Manifest rows match array rows":
-            all(shapes[s][0] == (full["split"] == s).sum() for s in SPLITS),
-        "Every window has identical duration":
-            bool(np.allclose(full["duration_s"], GRID[-1])),
-        "No window contains a dropout":
-            bool((full["max_raw_step_s"] <= MAX_STEP_S).all()),
-        "Overlap is 50% (step/size)":
-            abs(STEP_S / seconds - 0.5) < 1e-9,
-        "Train/validation flights disjoint":
-            not (fl["train"] & fl["validation"]),
+        f"Window shape is ({N}, {k}) in every split": all(
+            v[1:] == (N, k) for v in shapes.values()
+        ),
+        "Manifest rows match array rows": all(
+            shapes[s][0] == (full["split"] == s).sum() for s in SPLITS
+        ),
+        "Every window has identical duration": bool(
+            np.allclose(full["duration_s"], GRID[-1])
+        ),
+        "No window contains a dropout": bool(
+            (full["max_raw_step_s"] <= MAX_STEP_S).all()
+        ),
+        "Overlap is 50% (step/size)": abs(STEP_S / seconds - 0.5) < 1e-9,
+        "Train/validation flights disjoint": not (fl["train"] & fl["validation"]),
         "Train/test flights disjoint": not (fl["train"] & fl["test"]),
-        "Validation/test flights disjoint":
-            not (fl["validation"] & fl["test"]),
-        "Windows only from assigned split flights":
-            all(fl[s] <= sp[s] for s in SPLITS),
+        "Validation/test flights disjoint": not (fl["validation"] & fl["test"]),
+        "Windows only from assigned split flights": all(fl[s] <= sp[s] for s in SPLITS),
     }
     print("\nACCEPTANCE CHECKS")
     for name, ok in checks.items():

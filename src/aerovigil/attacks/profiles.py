@@ -4,6 +4,7 @@ Every profile returns the spoofed offset in metres (north, east) and its time
 derivative in m/s, as functions of tau = seconds since the attack started.
 Direction convention: 0 deg = north, 90 deg = east.
 """
+
 import numpy as np
 
 ATTACK_TYPES = (

@@ -14,7 +14,8 @@ def test_window_size_consistent(paths):
         d = np.load(paths["windows"] / f"windows_{s}.npz")
         assert d["X"].shape[1:] == (N_SAMPLES, k), s
         assert d["X"].shape[0] == len(
-            pd.read_csv(paths["windows"] / f"window_manifest_{s}.csv"))
+            pd.read_csv(paths["windows"] / f"window_manifest_{s}.csv")
+        )
         assert not np.isnan(d["X"]).any(), f"NaN in {s} windows"
 
 
@@ -58,5 +59,4 @@ def test_window_feature_order_matches_normalization(paths):
 def test_labels_attached_for_evaluation_not_input(paths):
     d = np.load(paths["windows"] / "windows_train.npz")
     assert d["attack_fraction"].shape[0] == d["X"].shape[0]
-    assert not any("attack" in str(n) or "label" in str(n)
-                   for n in d["feature_names"])
+    assert not any("attack" in str(n) or "label" in str(n) for n in d["feature_names"])

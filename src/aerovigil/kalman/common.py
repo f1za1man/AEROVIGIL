@@ -1,11 +1,13 @@
 """Shared helpers for the Module 06 scripts."""
+
+# ruff: noqa: F401
 import json
 from pathlib import Path
 
 import numpy as np
 
-from aerovigil.attacks.common import UNIT_TO_SECONDS, ROOT, load_yaml, resolve  # noqa: F401
-from aerovigil.kalman.calibrate_imu import get_columns  # noqa: F401
+from aerovigil.attacks.common import ROOT, UNIT_TO_SECONDS, load_yaml, resolve
+from aerovigil.kalman.calibrate_imu import get_columns
 
 
 def out_dir(cfg):
@@ -39,15 +41,22 @@ def load_noise_scale(cfg):
 
 def truth_arrays(g):
     """Ground-truth columns of a Module 04 attacked flight (never filter inputs)."""
-    return {"label": g["attack_label"].to_numpy(float),
-            "offset_e": g["spoof_offset_east_m"].to_numpy(float),
-            "offset_n": g["spoof_offset_north_m"].to_numpy(float),
-            "offset_m": g["spoof_offset_m"].to_numpy(float),
-            "rel_start": g["time_from_attack_start_s"].to_numpy(float)}
+    return {
+        "label": g["attack_label"].to_numpy(float),
+        "offset_e": g["spoof_offset_east_m"].to_numpy(float),
+        "offset_n": g["spoof_offset_north_m"].to_numpy(float),
+        "offset_m": g["spoof_offset_m"].to_numpy(float),
+        "rel_start": g["time_from_attack_start_s"].to_numpy(float),
+    }
 
 
 def orig_truth(g, label_col):
     """Original-dataset flights: labels only, no spoof-offset ground truth."""
     nan = np.full(len(g), np.nan)
-    return {"label": g[label_col].to_numpy(float), "offset_e": nan, "offset_n": nan,
-            "offset_m": nan, "rel_start": nan}
+    return {
+        "label": g[label_col].to_numpy(float),
+        "offset_e": nan,
+        "offset_n": nan,
+        "offset_m": nan,
+        "rel_start": nan,
+    }

@@ -52,9 +52,7 @@ def main():
                     "median_interval_s": med,
                 }
             )
-            gap_rows[-1]["position_fraction"] = (
-                (t_s[i] - t_s[0]) / (t_s[-1] - t_s[0])
-            )
+            gap_rows[-1]["position_fraction"] = (t_s[i] - t_s[0]) / (t_s[-1] - t_s[0])
 
         # ---- 3. Per-flight context ----------------------------------
         label_changes = int((np.diff(y_s) != 0).sum())
@@ -79,8 +77,12 @@ def main():
     print("=" * 65)
     print("1. OUT-OF-ORDER ROWS")
     print("=" * 65)
-    print(flights[["n_out_of_order", "max_backward_jump_s",
-                   "max_row_displacement"]].describe().round(4).to_string())
+    print(
+        flights[["n_out_of_order", "max_backward_jump_s", "max_row_displacement"]]
+        .describe()
+        .round(4)
+        .to_string()
+    )
 
     print("\n" + "=" * 65)
     print("2. GAPS")
@@ -93,17 +95,31 @@ def main():
         print("\nGap position within flight (0=start, 1=end):")
         print(gaps["position_fraction"].describe().round(3).to_string())
         print("\nTen longest gaps:")
-        print(gaps.nlargest(10, "gap_seconds")[
-            ["flight_id", "gap_seconds", "position_fraction",
-             "label_before", "label_after"]].round(3).to_string(index=False))
+        print(
+            gaps.nlargest(10, "gap_seconds")[
+                [
+                    "flight_id",
+                    "gap_seconds",
+                    "position_fraction",
+                    "label_before",
+                    "label_after",
+                ]
+            ]
+            .round(3)
+            .to_string(index=False)
+        )
 
     print("\n" + "=" * 65)
     print("3. SAMPLING RATE vs MISSION TYPE AND ATTACK FRACTION")
     print("=" * 65)
     print(pd.crosstab(flights["hz"], flights["mission_type"]).to_string())
     print("\nMean attack fraction by rate:")
-    print(flights.groupby("hz")["attack_fraction"]
-          .agg(["count", "mean", "min", "max"]).round(3).to_string())
+    print(
+        flights.groupby("hz")["attack_fraction"]
+        .agg(["count", "mean", "min", "max"])
+        .round(3)
+        .to_string()
+    )
 
     print("\n" + "=" * 65)
     print("4. ATTACK STRUCTURE PER FLIGHT")
@@ -113,9 +129,12 @@ def main():
     print(flights["label_transitions"].value_counts().sort_index().to_string())
     print("\nFlights fully normal :", int((flights["attack_fraction"] == 0).sum()))
     print("Flights fully attack :", int((flights["attack_fraction"] == 1).sum()))
-    print("Flights mixed        :",
-          int(((flights["attack_fraction"] > 0) &
-               (flights["attack_fraction"] < 1)).sum()))
+    print(
+        "Flights mixed        :",
+        int(
+            ((flights["attack_fraction"] > 0) & (flights["attack_fraction"] < 1)).sum()
+        ),
+    )
     print("=" * 65)
 
 

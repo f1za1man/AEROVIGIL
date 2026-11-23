@@ -6,6 +6,7 @@ Their NIS and position estimates must agree to numerical precision.
     pip install filterpy
     python src\\aerovigil\\kalman\\crosscheck_filterpy.py
 """
+
 import sys
 from pathlib import Path
 
@@ -15,10 +16,20 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "src"))
 
-from aerovigil.kalman.common import (UNIT_TO_SECONDS, get_columns, load_convention,  # noqa: E402
-                                     load_noise_scale, load_yaml, resolve)
-from aerovigil.kalman.kalman import (H_HORIZONTAL, KalmanFilter,  # noqa: E402
-                                     horizontal_matrices, noise_matrices)
+from aerovigil.kalman.common import (
+    UNIT_TO_SECONDS,
+    get_columns,
+    load_convention,  # noqa: E402
+    load_noise_scale,
+    load_yaml,
+    resolve,
+)
+from aerovigil.kalman.kalman import (
+    H_HORIZONTAL,
+    KalmanFilter,  # noqa: E402
+    horizontal_matrices,
+    noise_matrices,
+)
 from aerovigil.kalman.pipeline import prepare_ticks  # noqa: E402
 
 
@@ -48,25 +59,38 @@ def main():
         p0 = np.diag([fcfg["p0_pos"] ** 2, fcfg["p0_vel"] ** 2, fcfg["p0_bias"] ** 2])
         ours = KalmanFilter([[i["e"]], [i["ve"]], [0.0]], p0)
         fp = FPKalman(dim_x=3, dim_z=2)
-        fp.x = np.array([[i["e"]], [i["ve"]], [0.0]]); fp.P = p0.copy()
-        fp.H = H_HORIZONTAL.copy(); fp.R = r_h.copy()
+        fp.x = np.array([[i["e"]], [i["ve"]], [0.0]])
+        fp.P = p0.copy()
+        fp.H = H_HORIZONTAL.copy()
+        fp.R = r_h.copy()
         nis_a, nis_b, pos_a, pos_b = [], [], [], []
         for k in range(len(seg["t"])):
-            fm, bm, qm = horizontal_matrices(seg["dt"][k], fcfg["sigma_acc"], fcfg["sigma_bias_walk"])
+            fm, bm, qm = horizontal_matrices(
+                seg["dt"][k], fcfg["sigma_acc"], fcfg["sigma_bias_walk"]
+            )
             ours.predict(fm, qm, bm, [[seg["acc"][k, 0]]])
-            _, _, _, nis = ours.update([[seg["e"][k]], [seg["ve"][k]]], H_HORIZONTAL, r_h)
+            _, _, _, nis = ours.update(
+                [[seg["e"][k]], [seg["ve"][k]]], H_HORIZONTAL, r_h
+            )
             fp.predict(u=np.array([[seg["acc"][k, 0]]]), B=bm, F=fm, Q=qm)
             fp.update(np.array([[seg["e"][k]], [seg["ve"][k]]]))
             y = fp.y.reshape(-1, 1)
-            nis_a.append(nis[0]); nis_b.append(float((y.T @ np.linalg.inv(fp.S) @ y)[0, 0]))
-            pos_a.append(ours.x[0, 0]); pos_b.append(float(fp.x[0, 0]))
+            nis_a.append(nis[0])
+            nis_b.append(float((y.T @ np.linalg.inv(fp.S) @ y)[0, 0]))
+            pos_a.append(ours.x[0, 0])
+            pos_b.append(float(fp.x[0, 0]))
         d_nis = float(np.max(np.abs(np.array(nis_a) - nis_b)))
         d_pos = float(np.max(np.abs(np.array(pos_a) - pos_b)))
         ok = d_nis < 1e-6 and d_pos < 1e-6
         ok_all &= ok
-        print(f"  {f[:40]:40s} ticks {len(nis_a):5d} | max |NIS diff| {d_nis:.2e} | "
-              f"max |position diff| {d_pos:.2e} | {'PASS' if ok else 'FAIL'}")
-    print("\nRESULT:", "own filter matches FilterPy" if ok_all else "MISMATCH - send me this output")
+        print(
+            f"  {f[:40]:40s} ticks {len(nis_a):5d} | max |NIS diff| {d_nis:.2e} | "
+            f"max |position diff| {d_pos:.2e} | {'PASS' if ok else 'FAIL'}"
+        )
+    print(
+        "\nRESULT:",
+        "own filter matches FilterPy" if ok_all else "MISMATCH - send me this output",
+    )
     print("=" * 65)
     if not ok_all:
         raise SystemExit(1)

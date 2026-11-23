@@ -106,17 +106,22 @@ def main():
     print(report["duration_seconds"].describe().round(2).to_string())
 
     print("\nDATA QUALITY")
-    print(f"Flights with duplicate timestamps : "
-          f"{int((report['duplicate_timestamps'] > 0).sum())} "
-          f"(total {int(report['duplicate_timestamps'].sum()):,})")
-    print(f"Flights with out-of-order rows    : "
-          f"{int((report['out_of_order_in_file'] > 0).sum())} "
-          f"(total {int(report['out_of_order_in_file'].sum()):,})")
-    print(f"Flights with large gaps           : "
-          f"{int((report['large_gaps'] > 0).sum())} "
-          f"(total {int(report['large_gaps'].sum()):,})")
-    print(f"Largest single gap (seconds)      : "
-          f"{report['max_gap_s'].max():.4f}")
+    print(
+        f"Flights with duplicate timestamps : "
+        f"{int((report['duplicate_timestamps'] > 0).sum())} "
+        f"(total {int(report['duplicate_timestamps'].sum()):,})"
+    )
+    print(
+        f"Flights with out-of-order rows    : "
+        f"{int((report['out_of_order_in_file'] > 0).sum())} "
+        f"(total {int(report['out_of_order_in_file'].sum()):,})"
+    )
+    print(
+        f"Flights with large gaps           : "
+        f"{int((report['large_gaps'] > 0).sum())} "
+        f"(total {int(report['large_gaps'].sum()):,})"
+    )
+    print(f"Largest single gap (seconds)      : " f"{report['max_gap_s'].max():.4f}")
 
     print("\nUNIQUE ROUNDED RATES (Hz) AND FLIGHT COUNTS")
     print(report["estimated_hz"].round(0).value_counts().sort_index().to_string())

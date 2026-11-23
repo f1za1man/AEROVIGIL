@@ -1,4 +1,5 @@
 """Seeded, order-independent sampling of attack parameters and timing."""
+
 import zlib
 
 import numpy as np
@@ -45,16 +46,20 @@ def sample_params(rng, attack_type, acfg, fixed_rate=None):
         p["magnitude_m"] = _log_uniform(rng, *acfg["magnitude_m_range"])
         p["ramp_seconds"] = float(rng.uniform(*acfg["ramp_seconds_range"]))
     elif attack_type == "linear_drift":
-        p["drift_rate_mps"] = (float(fixed_rate) if fixed_rate is not None
-                               else _log_uniform(rng, *acfg["drift_rate_mps_range"]))
+        p["drift_rate_mps"] = (
+            float(fixed_rate)
+            if fixed_rate is not None
+            else _log_uniform(rng, *acfg["drift_rate_mps_range"])
+        )
     elif attack_type == "exponential_ramp":
         p["initial_rate_mps"] = _log_uniform(rng, *acfg["initial_rate_mps_range"])
         p["time_constant_s"] = float(rng.uniform(*acfg["time_constant_s_range"]))
         p["max_offset_m"] = float(acfg["max_offset_m"])
     elif attack_type == "low_amplitude_wander":
         p["amplitude_m"] = _log_uniform(rng, *acfg["amplitude_m_range"])
-        p["periods_s"] = sorted(float(x) for x in
-                                rng.uniform(*acfg["period_s_range"], size=3))
+        p["periods_s"] = sorted(
+            float(x) for x in rng.uniform(*acfg["period_s_range"], size=3)
+        )
         p["phases_north"] = [float(x) for x in rng.uniform(0, 2 * np.pi, 3)]
         p["phases_east"] = [float(x) for x in rng.uniform(0, 2 * np.pi, 3)]
     else:
@@ -62,8 +67,9 @@ def sample_params(rng, attack_type, acfg, fixed_rate=None):
     return p
 
 
-def sample_attack(cfg, source_id, flight_duration_s, attack_set, attack_type,
-                  draw=0, rate=None):
+def sample_attack(
+    cfg, source_id, flight_duration_s, attack_set, attack_type, draw=0, rate=None
+):
     """Full, reproducible attack specification (without the new flight id)."""
     seed = cfg["random_seed"]
     key = f"{attack_set}|{source_id}|{attack_type}|{draw}|{rate}"
@@ -71,19 +77,30 @@ def sample_attack(cfg, source_id, flight_duration_s, attack_set, attack_type,
 
     if attack_set == "sweep":
         sw = cfg["sweep"]
-        timing = sample_timing(rng, flight_duration_s, cfg["timing"],
-                               start_fraction=sw["start_fraction"], until_end=True)
+        timing = sample_timing(
+            rng,
+            flight_duration_s,
+            cfg["timing"],
+            start_fraction=sw["start_fraction"],
+            until_end=True,
+        )
         mode = sw["velocity_mode"]
     else:
         timing = sample_timing(rng, flight_duration_s, cfg["timing"])
-        mode = ("consistent"
-                if rng.uniform() < cfg["probability_consistent_velocity"]
-                else "position_only")
+        mode = (
+            "consistent"
+            if rng.uniform() < cfg["probability_consistent_velocity"]
+            else "position_only"
+        )
     if timing is None:
         return None
-    params = sample_params(rng, attack_type, cfg["attack_types"][attack_type],
-                           fixed_rate=rate)
+    params = sample_params(
+        rng, attack_type, cfg["attack_types"][attack_type], fixed_rate=rate
+    )
     return {
-        "attack_type": attack_type, "start_s": timing[0],
-        "duration_s": timing[1], "velocity_mode": mode, "params": params,
+        "attack_type": attack_type,
+        "start_s": timing[0],
+        "duration_s": timing[1],
+        "velocity_mode": mode,
+        "params": params,
     }

@@ -9,6 +9,7 @@ Usage:
     python src\\aerovigil\\kalman\\run_filter.py
     python src\\aerovigil\\kalman\\run_filter.py --limit 3          (smoke test)
 """
+
 import argparse
 import sys
 import time
@@ -19,16 +20,28 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "src"))
 
-from aerovigil.kalman.common import (UNIT_TO_SECONDS, get_columns, load_convention,  # noqa: E402
-                                     load_noise_scale, load_yaml, orig_truth, out_dir,
-                                     resolve, truth_arrays)
+from aerovigil.kalman.common import (
+    UNIT_TO_SECONDS,
+    get_columns,
+    load_convention,  # noqa: E402
+    load_noise_scale,
+    load_yaml,
+    orig_truth,
+    out_dir,
+    resolve,
+    truth_arrays,
+)
 from aerovigil.kalman.pipeline import run_flight  # noqa: E402
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--config", default=str(ROOT / "configs" / "kalman" / "kalman.yaml"))
-    ap.add_argument("--limit", type=int, default=None, help="flights per set (smoke test)")
+    ap.add_argument(
+        "--config", default=str(ROOT / "configs" / "kalman" / "kalman.yaml")
+    )
+    ap.add_argument(
+        "--limit", type=int, default=None, help="flights per set (smoke test)"
+    )
     ap.add_argument("--output-dir", default=None)
     a = ap.parse_args()
 
@@ -44,18 +57,34 @@ def main():
     report = pd.read_csv(resolve(cfg["paths"]["cleaning_report"]))
     man = pd.read_csv(resolve(cfg["paths"]["attack_manifest"]))
     jobs = {
-        "orig": [(r["flight_id"], resolve(cfg["paths"]["cleaned_dir"]) / r["file"], False)
-                 for _, r in report.iterrows()],
-        "syn": [(r["attacked_flight_id"], resolve(cfg["paths"]["attacked_dir"]) / r["file"], True)
-                for _, r in man[man.attack_set == "main"].iterrows()],
-        "sweep": [(r["attacked_flight_id"], resolve(cfg["paths"]["attacked_dir"]) / r["file"], True)
-                  for _, r in man[man.attack_set == "sweep"].iterrows()],
+        "orig": [
+            (r["flight_id"], resolve(cfg["paths"]["cleaned_dir"]) / r["file"], False)
+            for _, r in report.iterrows()
+        ],
+        "syn": [
+            (
+                r["attacked_flight_id"],
+                resolve(cfg["paths"]["attacked_dir"]) / r["file"],
+                True,
+            )
+            for _, r in man[man.attack_set == "main"].iterrows()
+        ],
+        "sweep": [
+            (
+                r["attacked_flight_id"],
+                resolve(cfg["paths"]["attacked_dir"]) / r["file"],
+                True,
+            )
+            for _, r in man[man.attack_set == "sweep"].iterrows()
+        ],
     }
     print("=" * 65)
     print("AEROVIGIL - KALMAN FILTER RUN")
     print("=" * 65)
     print(f"IMU convention: {conv if conv else 'NONE (constant-velocity model)'}")
-    print(f"Noise scale   : {noise:.4f} | filter rate {fcfg['rate_hz']} Hz | warm-up {fcfg['warmup_s']} s")
+    print(
+        f"Noise scale   : {noise:.4f} | filter rate {fcfg['rate_hz']} Hz | warm-up {fcfg['warmup_s']} s"
+    )
     started, total_ticks, skipped = time.time(), 0, 0
     for name, items in jobs.items():
         folder = base / "innovations" / name
@@ -63,7 +92,7 @@ def main():
         for old in folder.glob("*.parquet"):
             old.unlink()
         if a.limit:
-            items = items[:a.limit]
+            items = items[: a.limit]
         for n, (fid, path, attacked) in enumerate(items, start=1):
             g = pd.read_parquet(path)
             truth = truth_arrays(g) if attacked else orig_truth(g, cols["label"])

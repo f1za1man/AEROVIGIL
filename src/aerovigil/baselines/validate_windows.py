@@ -3,6 +3,7 @@
 Usage:
     python src\\aerovigil\\baselines\\validate_windows.py
 """
+
 import argparse
 import sys
 from collections import defaultdict
@@ -14,18 +15,33 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "src"))
 
-from aerovigil.attacks.common import (UNIT_TO_SECONDS, load_split_map,  # noqa: E402
-                                      load_yaml, resolve)
+from aerovigil.attacks.common import (
+    UNIT_TO_SECONDS,
+    load_split_map,  # noqa: E402
+    load_yaml,
+    resolve,
+)
 from aerovigil.baselines.datasets import stat_columns  # noqa: E402
 from aerovigil.baselines.windows import STATS  # noqa: E402
 
-FORBIDDEN = ("attack", "label", "flight", "source", "spoof", "time_from", "split", "mission")
+FORBIDDEN = (
+    "attack",
+    "label",
+    "flight",
+    "source",
+    "spoof",
+    "time_from",
+    "split",
+    "mission",
+)
 N_RECOMPUTE = 40
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--config", default=str(ROOT / "configs" / "baselines" / "baselines.yaml"))
+    ap.add_argument(
+        "--config", default=str(ROOT / "configs" / "baselines" / "baselines.yaml")
+    )
     ap.add_argument("--output-dir", default=None)
     a = ap.parse_args()
 
@@ -35,7 +51,9 @@ def main():
     hop_s = win_s * (1.0 - float(pre["processing"]["window_overlap"]))
     scale = UNIT_TO_SECONDS[pre["dataset"]["timestamp_unit"]]
     pos_min = cfg["windows"]["label"]["positive_min_fraction"]
-    out_dir = Path(a.output_dir) if a.output_dir else resolve(cfg["paths"]["output_dir"])
+    out_dir = (
+        Path(a.output_dir) if a.output_dir else resolve(cfg["paths"]["output_dir"])
+    )
     out_dir = out_dir if out_dir.is_absolute() else ROOT / out_dir
 
     orig = pd.read_parquet(out_dir / "windows_orig.parquet")
@@ -50,8 +68,10 @@ def main():
     print("=" * 65)
     print("AEROVIGIL - WINDOW TABLE VALIDATION")
     print("=" * 65)
-    print(f"Original windows {len(orig):,} | synthetic windows {len(syn):,} | "
-          f"summary features {len(cols)}")
+    print(
+        f"Original windows {len(orig):,} | synthetic windows {len(syn):,} | "
+        f"summary features {len(cols)}"
+    )
 
     # -------- splits --------
     if not (orig["split"] == orig["flight_id"].map(split_map)).all():
@@ -59,8 +79,10 @@ def main():
     if (orig.groupby("flight_id")["split"].nunique() > 1).any():
         fails["no flight appears in two splits"].append("orig")
     msplit = dict(zip(man["attacked_flight_id"], man["split"]))
-    if not (syn["split"] == syn["flight_id"].map(msplit)).all() or \
-            not (syn["split"] == syn["source_flight_id"].map(split_map)).all():
+    if (
+        not (syn["split"] == syn["flight_id"].map(msplit)).all()
+        or not (syn["split"] == syn["source_flight_id"].map(split_map)).all()
+    ):
         fails["synthetic windows inherit the source flight's split"].append("syn")
     if (syn.groupby("flight_id")["split"].nunique() > 1).any():
         fails["no flight appears in two splits"].append("syn")
@@ -82,10 +104,15 @@ def main():
         fails["window starts lie on the hop grid"].append("grid")
     if both.duplicated(["flight_id", "window_start_s"]).any():
         fails["no duplicate windows"].append("dup")
-    expect_y = np.where(both["attack_fraction"] == 0, 0,
-                        np.where(both["attack_fraction"] >= pos_min, 1, -1))
-    if not (both["y"].to_numpy() == expect_y).all() or \
-            not (both["ambiguous"].to_numpy() == (expect_y == -1)).all():
+    expect_y = np.where(
+        both["attack_fraction"] == 0,
+        0,
+        np.where(both["attack_fraction"] >= pos_min, 1, -1),
+    )
+    if (
+        not (both["y"].to_numpy() == expect_y).all()
+        or not (both["ambiguous"].to_numpy() == (expect_y == -1)).all()
+    ):
         fails["label follows the configured rule"].append("labels")
     if not (syn["attack_fraction"] > 0).all():
         fails["synthetic windows all overlap the attack"].append("syn")
@@ -120,23 +147,39 @@ def main():
     worst = 0.0
     for i in idx:
         w = orig.iloc[i]
-        f = pd.read_parquet(resolve(cfg["paths"]["features_dir"]) / file_of[w["flight_id"]])
+        f = pd.read_parquet(
+            resolve(cfg["paths"]["features_dir"]) / file_of[w["flight_id"]]
+        )
         t = (f["time_usec"].to_numpy("int64") - f["time_usec"].iloc[0]) * scale
-        a0, b0 = np.searchsorted(t, [w["window_start_s"], w["window_end_s"]], side="left")
+        a0, b0 = np.searchsorted(
+            t, [w["window_start_s"], w["window_end_s"]], side="left"
+        )
         sl = f.iloc[a0:b0]
         if len(sl) != w["n_rows"] or sl["after_gap"].to_numpy()[1:].any():
-            fails["recomputed window matches rows and has no gap"].append(w["flight_id"])
+            fails["recomputed window matches rows and has no gap"].append(
+                w["flight_id"]
+            )
             continue
         if abs(sl["attack_label"].mean() - w["attack_fraction"]) > 1e-9:
             fails["recomputed attack fraction matches"].append(w["flight_id"])
-        for feat in ("res_horizontal_velocity", "gps_speed_from_position", "res_altitude"):
+        for feat in (
+            "res_horizontal_velocity",
+            "gps_speed_from_position",
+            "res_altitude",
+        ):
             x = sl[feat].to_numpy(float)
-            for stat, val in (("mean", np.nanmean(x)), ("max", np.nanmax(x)), ("min", np.nanmin(x)),
-                              ("std", np.nanstd(x))):
+            for stat, val in (
+                ("mean", np.nanmean(x)),
+                ("max", np.nanmax(x)),
+                ("min", np.nanmin(x)),
+                ("std", np.nanstd(x)),
+            ):
                 got = w[f"{feat}__{stat}"]
                 worst = max(worst, abs(got - val) / (abs(val) + 1e-6))
     if worst > 1e-3:
-        fails["recomputed statistics match the table (rel. error < 1e-3)"].append(f"{worst:.2e}")
+        fails["recomputed statistics match the table (rel. error < 1e-3)"].append(
+            f"{worst:.2e}"
+        )
     print(f"Largest relative error of {len(idx)} recomputed windows: {worst:.2e}")
 
     checks = [
@@ -163,7 +206,10 @@ def main():
     print("\nVALIDATION RESULTS")
     for c in checks:
         ok = c not in fails
-        print(f"  [{'PASS' if ok else 'FAIL'}] {c}" + ("" if ok else f"  -> {fails[c][:3]}"))
+        print(
+            f"  [{'PASS' if ok else 'FAIL'}] {c}"
+            + ("" if ok else f"  -> {fails[c][:3]}")
+        )
     print("=" * 65)
     if fails:
         raise SystemExit("Window validation FAILED")

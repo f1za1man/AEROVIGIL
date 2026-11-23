@@ -150,14 +150,18 @@ def dictionary():
         return str(x).replace("|", "\\|")
 
     lines = [
-        "# Feature Dictionary", "",
+        "# Feature Dictionary",
+        "",
         "Generated from feature_metadata.csv. Features marked unavailable were "
-        "not generated.", "",
-        "Parameters: lag L = 1 s, rolling window = 2 s (trailing, causal).", "",
+        "not generated.",
+        "",
+        "Parameters: lag L = 1 s, rolling window = 2 s (trailing, causal).",
+        "",
     ]
     for _, r in meta.iterrows():
         lines += [
-            f"## {esc(r['feature'])}", "",
+            f"## {esc(r['feature'])}",
+            "",
             f"- Formula: {esc(r['formula'])}",
             f"- Source columns: {esc(r['source_columns'])}",
             f"- Units: {esc(r['units'])}",

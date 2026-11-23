@@ -27,9 +27,12 @@ def main():
     time_col = cfg["dataset"]["timestamp_column"]
     label_col = cfg["labels"]["attack_column"]
     attack_value = cfg["labels"]["attack_value"]
-    scale = {"seconds": 1.0, "milliseconds": 1e-3,
-             "microseconds": 1e-6, "nanoseconds": 1e-9}[
-        cfg["dataset"]["timestamp_unit"]]
+    scale = {
+        "seconds": 1.0,
+        "milliseconds": 1e-3,
+        "microseconds": 1e-6,
+        "nanoseconds": 1e-9,
+    }[cfg["dataset"]["timestamp_unit"]]
 
     CLEAN_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -93,22 +96,24 @@ def main():
         out_file = CLEAN_DIR / f"{name}.parquet"
         g.to_parquet(out_file, index=False)
 
-        report.append({
-            "flight_id": fid,
-            "file": out_file.name,
-            "mission_type": g["mission_type"].iloc[0],
-            "rows_in": rows_in,
-            "rows_out": len(g),
-            "out_of_order_rows": out_of_order,
-            "duplicate_timestamps": duplicates,
-            "sorted_after_cleaning": is_sorted,
-            "missing_values": missing_total,
-            "non_numeric_coerced_to_nan": coerced,
-            "median_interval_s": med,
-            "large_gaps": gaps,
-            "max_gap_s": max_gap,
-            "attack_rows": attack_rows,
-        })
+        report.append(
+            {
+                "flight_id": fid,
+                "file": out_file.name,
+                "mission_type": g["mission_type"].iloc[0],
+                "rows_in": rows_in,
+                "rows_out": len(g),
+                "out_of_order_rows": out_of_order,
+                "duplicate_timestamps": duplicates,
+                "sorted_after_cleaning": is_sorted,
+                "missing_values": missing_total,
+                "non_numeric_coerced_to_nan": coerced,
+                "median_interval_s": med,
+                "large_gaps": gaps,
+                "max_gap_s": max_gap,
+                "attack_rows": attack_rows,
+            }
+        )
 
         if n % 40 == 0 or n == len(groups):
             print(f"Cleaned {n}/{len(groups)} flights")
@@ -120,8 +125,9 @@ def main():
     total_out = int(rep["rows_out"].sum())
     attack_out = int(rep["attack_rows"].sum())
     checks = {
-        "Every flight has an ID": bool(rep["flight_id"].notna().all()
-                                       and (rep["flight_id"] != "").all()),
+        "Every flight has an ID": bool(
+            rep["flight_id"].notna().all() and (rep["flight_id"] != "").all()
+        ),
         "Timestamps ordered in every flight": bool(rep["sorted_after_cleaning"].all()),
         "No rows lost": total_in == total_out,
         "Attack labels preserved": attack_in == attack_out,

@@ -1,0 +1,53 @@
+# AEROVIGIL Module 05 - classical ML baselines on window summary features.
+# One command builds the tables, another trains and evaluates every model.
+
+paths:
+  preprocessing_config: configs/preprocessing/preprocessing.yaml
+  cleaning_report: data/processed/module03/cleaning_report.csv
+  flight_splits: data/interim/module03/flight_splits.csv
+  features_dir: data/processed/module03/features        # Module 03 per-flight features
+  attack_manifest: data/processed/module04/attack_manifest.csv
+  attacked_dir: data/processed/module04/attacked
+  output_dir: data/processed/module05
+
+windows:
+  min_valid_fraction: 0.5          # every feature needs >= 50% valid rows in a window
+  label:
+    positive_min_fraction: 0.5     # attack fraction >= 0.5 -> attack window
+    # 0 < fraction < 0.5 is "ambiguous" and is excluded from training and scoring
+  synthetic_attack_set: main       # Module 04 'main' set (the 'sweep' set is for Modules 8-9)
+  # Synthetic flights contribute only windows that overlap the attack. Their normal
+  # parts are copies of the source flight, which is already in the original table.
+
+expected_feature_count: 22
+
+training_sources: [orig, syn]      # must contain orig; [orig] = original-dataset attacks only
+balance_train_val: true            # down-sample the majority class (training + validation only)
+random_seed: 42                    # seed used for tuning
+n_final_seeds: 5                   # final runs for stochastic models (seed, seed+1, ...)
+operating_point_fpr: 0.01          # report TPR at 1% window false-positive rate
+isolation_forest_threshold_quantile: 0.95   # of validation NORMAL scores
+
+protocols:
+  seen: true                       # flight-disjoint, every mission type seen in training
+  unseen_mission: true             # leave-one-mission-type-out
+
+# Small grids, tuned on validation flights (F1; Isolation Forest uses ROC-AUC).
+models:
+  logistic_regression:
+    C: [0.01, 0.1, 1.0, 10.0]
+  naive_bayes:
+    var_smoothing: [1.0e-9, 1.0e-7, 1.0e-5]
+  knn:
+    n_neighbors: [5, 15, 35]
+  decision_tree:
+    max_depth: [4, 8, 16, null]
+    min_samples_leaf: [1, 10]
+  random_forest:
+    n_estimators: [200]
+    max_depth: [8, 16, null]
+    min_samples_leaf: [1, 5]
+  isolation_forest:
+    n_estimators: [200]
+    max_samples: [256, 1024]
+    max_features: [0.5, 1.0]

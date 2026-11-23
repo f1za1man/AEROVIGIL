@@ -1,0 +1,57 @@
+# AEROVIGIL Module 06 - Kalman-filter + CUSUM detector (physics-based).
+# IMU drives the prediction; GPS, barometer and the IMU-fused attitude close the loop.
+
+paths:
+  preprocessing_config: configs/preprocessing/preprocessing.yaml
+  cleaning_report: data/processed/module03/cleaning_report.csv
+  cleaned_dir: data/processed/module03/cleaned
+  flight_splits: data/interim/module03/flight_splits.csv
+  attack_manifest: data/processed/module04/attack_manifest.csv
+  attacked_dir: data/processed/module04/attacked
+  output_dir: data/processed/module06
+
+columns:                                   # IMU columns (the rest come from preprocessing.yaml)
+  accel: [linear_acceleration_x, linear_acceleration_y, linear_acceleration_z]
+  quat: [orientation_x, orientation_y, orientation_z, orientation_w]    # x, y, z, w
+  mag: [magnetic_field_x, magnetic_field_y, magnetic_field_z]
+
+imu_calibration:                           # data-driven test of axis and gravity conventions
+  n_flights: 18                            # normal TRAIN flights
+  lag_s: 1.0
+  min_horizontal_r2: 0.10
+  min_margin: 0.05
+  max_abs_vertical_mean: 1.0               # m/s^2
+
+filter:
+  rate_hz: 10                              # the IMU is averaged to this rate
+  warmup_s: 5.0                            # innovations are ignored while the filter converges
+  min_segment_s: 8.0                       # shorter gap-free pieces are skipped
+  gap_factor: 10                           # same large-gap rule as Module 03; the filter restarts
+  gravity: 9.80665
+  sigma_pos_m: 1.0                         # GPS position noise
+  sigma_vel_mps: 0.3                       # GPS velocity noise
+  sigma_gps_alt_m: 1.0
+  sigma_baro_m: 0.3
+  sigma_vu_mps: 0.3
+  sigma_acc: 0.5                           # white acceleration noise (m/s^2)
+  sigma_acc_no_imu: 2.0                    # used only if no IMU convention is accepted
+  sigma_bias_walk: 0.02                    # accelerometer-bias random walk
+  sigma_baro_bias_walk: 0.05
+  p0_pos: 2.0
+  p0_vel: 1.0
+  p0_bias: 0.2
+  p0_baro_bias: 2.0
+
+noise_tuning:                              # scales the GPS/baro noise until NIS matches its dof
+  n_flights: 24                            # normal TRAIN flights
+  iterations: 4
+  scale_min: 0.05
+  scale_max: 50.0
+
+detector:
+  false_alarm_budget_per_hour: 1.0         # the fixed budget shared by all detectors
+  refractory_s: 10.0
+  cusum_k_grid: [0.25, 0.5, 1.0]           # reference value, in standard deviations
+  calibration_splits: [train, validation]  # normal time used to set thresholds
+  tuning_split: validation                 # attacks used to choose k
+  evaluation_split: test

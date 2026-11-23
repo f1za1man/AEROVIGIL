@@ -1,0 +1,48 @@
+# AEROVIGIL Module 07 - LSTM autoencoder (one-class) and supervised LSTM detectors.
+# Windows follow Module 03/05 (length and hop come from preprocessing.yaml); each window is
+# averaged into short bins so the LSTM sees a small sequence instead of 625 rows.
+
+paths:
+  preprocessing_config: configs/preprocessing/preprocessing.yaml
+  cleaning_report: data/processed/module03/cleaning_report.csv
+  flight_splits: data/interim/module03/flight_splits.csv
+  features_dir: data/processed/module03/features        # Module 03 per-flight features (22 + after_gap)
+  attack_manifest: data/processed/module04/attack_manifest.csv
+  attacked_dir: data/processed/module04/attacked
+  kalman_dir: data/processed/module06                   # only read, for the comparison figures
+  output_dir: data/processed/module07
+
+windows:
+  bin_s: 0.25                    # must divide the hop (2.5 s); 5 s window -> 20 steps
+  max_missing_fraction: 0.10     # drop a window with more than 10% missing values
+  positive_min_fraction: 0.5     # same label rule as Module 05
+  expected_feature_count: 22
+  synthetic_sets: [main, sweep]
+  sweep_splits: [test]           # the sweep set is only needed on test flights
+  scaler_clip: 8.0
+
+training:
+  seed: 42
+  n_final_seeds: 5               # AE and supervised (seen attacks)
+  n_unseen_seeds: 3              # supervised, one attack family held out
+  max_epochs: 150
+  patience: 15
+  batch_size: 256
+  weight_decay: 1.0e-5
+  grad_clip: 1.0
+  threads: 4                     # CPU threads for PyTorch
+
+# Starting values; tune_lstm.py overwrites them with the Optuna result (best_params.json).
+ae_params:  {hidden: 32, layers: 1, latent: 16, dropout: 0.0, lr: 0.001}
+clf_params: {hidden: 32, layers: 1, dropout: 0.1, lr: 0.001}
+
+tuning:
+  n_trials: 30                   # per model; small on purpose
+  max_epochs: 40
+  patience: 8
+  use_mlflow: true
+
+detector:
+  false_alarm_budget_per_hour: 1.0   # same budget as Module 06
+  refractory_s: 10.0                 # same refractory rule as Module 06
+  operating_point_fpr: 0.01          # window-level TPR / F1 are reported at 1% FPR (as in Module 05)

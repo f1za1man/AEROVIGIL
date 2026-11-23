@@ -43,3 +43,7 @@ data/processed/*
 !data/raw/.gitkeep
 !data/interim/.gitkeep
 !data/processed/.gitkeep
+
+# Experiment tracking
+mlflow.db
+mlruns/

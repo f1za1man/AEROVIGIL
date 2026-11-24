@@ -180,14 +180,12 @@ class Constant:
         return np.column_stack([1 - p, p])
 
 
-def test_latch_threshold_allows_the_requested_number_of_alarms(paths):
+def test_latch_threshold_uses_validation_normals_only(paths):
     orig = bw.run(("orig",))["orig"]
     cols = rs.summary_columns(orig, "all")
     model = Constant(0)
     thr, n_pool, pool_h, allowed = rs.latch_threshold(model, orig, cols, 1.0)
-    pool = orig[
-        orig["split"].isin(["train", "validation"]) & (orig["attack_type"] == "none")
-    ]
+    pool = orig[(orig["split"] == "validation") & (orig["attack_type"] == "none")]
     assert n_pool == len(pool) and pool_h == pytest.approx(rs.hours(pool))
     assert allowed == max(1, round(1.0 * pool_h))
     scores = model.predict_proba(pool[cols].to_numpy("float32"))[:, 1]
@@ -217,6 +215,7 @@ def test_rescore_runs_end_to_end_and_writes_both_tables(paths):
     wtab, ftab = rs.run(alarms_per_hour=2.0, out_dir=out)
     assert set(wtab["task"]) == {"window", "event"}
     assert set(wtab["features"]) == {"gps", "all"}
+    assert set(wtab["sources"]) == {"orig"}  # no synthetic table was built
     assert len(wtab) == 2 * 2 * 2
     assert wtab["auc_orig"].between(0, 1).all()
     assert "auc_syn_consistent" not in wtab  # no synthetic table was built

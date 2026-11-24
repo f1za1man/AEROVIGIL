@@ -178,11 +178,11 @@ def run(sources=("orig",), limit=None, output_dir=None):
         tables[name].to_parquet(out / f"windows_{name}.parquet", index=False)
         print(f"  dropped windows: {dropped_all}")
     pd.Series(features, name="feature").to_csv(out / "feature_names.csv", index=False)
-    report(tables, features, out, time.time() - started)
+    report(tables, features, out, time.time() - started), bool(limit))
     return tables
 
 
-def report(tables, features, out, elapsed):
+def report(tables, features, out, elapsed, partial=False):
     pd.set_option("display.width", 200)
     orig = tables["orig"]
     print("\nWindows: " + "  ".join(f"{k} {len(v):,}" for k, v in tables.items()))
@@ -218,6 +218,9 @@ def report(tables, features, out, elapsed):
         ).any(),
     }  # fmt: skip
     print(f"\nElapsed {elapsed:.0f} s   saved to {out}\n\nACCEPTANCE CHECKS")
+    if partial:
+        print("  skipped: --limit was used, so a split can legitimately be empty")
+        return
     for k, v in checks.items():
         print(f"  [{'PASS' if v else 'FAIL'}] {k}")
     if not all(checks.values()):

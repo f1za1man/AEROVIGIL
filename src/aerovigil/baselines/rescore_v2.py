@@ -34,6 +34,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
+from sklearn.model_selection import GroupKFold
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
@@ -41,6 +42,7 @@ from aerovigil.baselines.build_window_tables_v2 import IMU_PREFIX, OUT_DIR
 from aerovigil.windowing.make_windows_v2 import SECONDS, STEP_S
 
 SEED = 42
+FOLDS = 4
 TASKS = ("window", "event")
 FEATURE_SETS = ("gps", "all")
 TRAIN_SOURCES = ("orig", "orig+syn")
@@ -109,7 +111,7 @@ def fit_and_score(orig, syn, task, feature_set, name, model, sources):
             ]
             both = pd.concat([pos, neg], ignore_index=True)
             row[f"auc_syn_{mode}"] = auc_of(model, both, cols, both[y])
-    return row
+    return row, tr
 
 
 def auc_of(model, frame, cols, y):
@@ -124,14 +126,32 @@ def hours(frame):
     return len(frame) * STEP_S / 3600.0
 
 
-def latch_threshold(model, orig, cols, alarms_per_hour):
-    """Threshold from the normal VALIDATION flights: the model never trained on them,
-    so its scores there are honest. Training normals would set it far too low."""
-    pool = orig[(orig["split"] == "validation") & (orig["attack_type"] == "none")]
-    p = model.predict_proba(pool[cols].to_numpy("float32"))[:, 1]
-    allowed = max(1, round(alarms_per_hour * hours(pool)))
-    thr = float(np.sort(p)[-allowed])
-    return thr, len(pool), hours(pool), allowed
+def clean_scores(name, task, tr, orig, model, cols):
+    """Honest scores on normal-flight windows. The validation flights alone are only
+    0.7 h, so one outlier window sets the threshold; adding out-of-fold scores from
+    the training flights gives about 4 h without ever scoring a flight the model saw."""
+    y = f"y_{task}"
+    parts = []
+    groups = tr["flight_id"].to_numpy()
+    n = min(FOLDS, len(np.unique(groups)))
+    is_normal = (tr["attack_type"] == "none").to_numpy()
+    if n >= 2 and is_normal.any():
+        oof = np.full(len(tr), np.nan)
+        for a, b in GroupKFold(n_splits=n).split(tr, groups=groups):
+            fold = models()[name]
+            fold.fit(tr.iloc[a][cols].to_numpy("float32"), tr.iloc[a][y].to_numpy())
+            oof[b] = fold.predict_proba(tr.iloc[b][cols].to_numpy("float32"))[:, 1]
+        parts.append(oof[is_normal & np.isfinite(oof)])
+    val = orig[(orig["split"] == "validation") & (orig["attack_type"] == "none")]
+    parts.append(model.predict_proba(val[cols].to_numpy("float32"))[:, 1])
+    return np.concatenate(parts)
+
+
+def latch_threshold(scores, alarms_per_hour):
+    """Highest score the clean pool is allowed to reach at the given alarm budget."""
+    pool_h = len(scores) * STEP_S / 3600.0
+    allowed = max(1, round(alarms_per_hour * pool_h))
+    return float(np.sort(scores)[-allowed]), len(scores), pool_h, allowed
 
 
 def latch_evaluate(model, orig, cols, thr):
@@ -185,19 +205,19 @@ def run(alarms_per_hour=1.0, out_dir=None):
         for fs in FEATURE_SETS:
             for src in source_sets:
                 for name, model in models().items():
-                    r = fit_and_score(orig, syn, task, fs, name, model, src)
+                    r, tr = fit_and_score(orig, syn, task, fs, name, model, src)
                     window_rows.append(r)
-                    fitted[(task, fs, src, name)] = (model, summary_columns(orig, fs))
+                    cols = summary_columns(orig, fs)
+                    fitted[(task, fs, src, name)] = (model, cols, tr)
                     print(
                         f"  fitted {task:6s} {fs:3s} {src:8s} {name:20s} "
                         f"auc_orig={r['auc_orig']:.3f}"
                     )
     wtab = pd.DataFrame(window_rows)
     wtab.to_csv(out / "rescore_window.csv", index=False)
-    for (task, fs, src, name), (model, cols) in fitted.items():
-        thr, n_pool, pool_h, allowed = latch_threshold(
-            model, orig, cols, alarms_per_hour
-        )
+    for (task, fs, src, name), (model, cols, tr) in fitted.items():
+        pool = clean_scores(name, task, tr, orig, model, cols)
+        thr, n_pool, pool_h, allowed = latch_threshold(pool, alarms_per_hour)
         flights, rate = latch_evaluate(model, orig, cols, thr)
         flights.insert(0, "sources", src)
         flights.insert(0, "features", fs)
@@ -207,7 +227,7 @@ def run(alarms_per_hour=1.0, out_dir=None):
         att = flights[flights["attacked"]]
         print(
             f"  latched {task:6s} {fs:3s} {src:8s} {name:20s} thr={thr:.3f} "
-            f"({n_pool:,} validation normal windows, {pool_h:.1f} h, "
+            f"({n_pool:,} clean windows, {pool_h:.1f} h, "
             f"{allowed} alarms allowed) -> detected {att['detected'].mean():.2f}, "
             f"{rate:.2f} alarms/h on test normals"
         )

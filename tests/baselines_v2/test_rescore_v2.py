@@ -180,16 +180,25 @@ class Constant:
         return np.column_stack([1 - p, p])
 
 
-def test_latch_threshold_uses_validation_normals_only(paths):
+def test_latch_threshold_matches_the_alarm_budget():
+    scores = np.linspace(0, 1, 1440)  # 1440 windows = exactly one hour of flight
+    thr, n_pool, pool_h, allowed = rs.latch_threshold(scores, 4.0)
+    assert n_pool == 1440 and pool_h == pytest.approx(1.0) and allowed == 4
+    assert (scores > thr).sum() == 3  # strictly above the 4th largest
+    assert rs.latch_threshold(scores, 0.0)[3] == 1  # never fewer than one
+
+
+def test_clean_scores_cover_training_and_validation_normal_flights(paths):
     orig = bw.run(("orig",))["orig"]
     cols = rs.summary_columns(orig, "all")
-    model = Constant(0)
-    thr, n_pool, pool_h, allowed = rs.latch_threshold(model, orig, cols, 1.0)
-    pool = orig[(orig["split"] == "validation") & (orig["attack_type"] == "none")]
-    assert n_pool == len(pool) and pool_h == pytest.approx(rs.hours(pool))
-    assert allowed == max(1, round(1.0 * pool_h))
-    scores = model.predict_proba(pool[cols].to_numpy("float32"))[:, 1]
-    assert (scores > thr).sum() == allowed - 1  # strictly above the k-th largest
+    model = rs.models()["logistic_regression"]
+    tr = orig[(orig["split"] == "train") & (orig["y_event"] >= 0)]
+    model.fit(tr[cols].to_numpy("float32"), tr["y_event"].to_numpy())
+    pool = rs.clean_scores("logistic_regression", "event", tr, orig, model, cols)
+    val = orig[(orig["split"] == "validation") & (orig["attack_type"] == "none")]
+    assert len(pool) == len(tr[tr["attack_type"] == "none"]) + len(val)
+    assert len(pool) > len(val)  # the training flights enlarge the clean pool
+    assert np.isfinite(pool).all() and ((pool >= 0) & (pool <= 1)).all()
 
 
 def test_latch_marks_detection_delay_and_pre_onset_alarms(paths):

@@ -1,0 +1,49 @@
+{
+  "seed": 42,
+  "flights": {
+    "train": 252,
+    "validation": 54,
+    "test": 54
+  },
+  "rows": {
+    "train": 5549191,
+    "validation": 1150030,
+    "test": 1193828
+  },
+  "attack_rows": {
+    "train": 3017138,
+    "validation": 617103,
+    "test": 667904
+  },
+  "by_mission_type": {
+    "train": {
+      "curved": 76,
+      "random": 100,
+      "straight": 76
+    },
+    "validation": {
+      "curved": 16,
+      "random": 22,
+      "straight": 16
+    },
+    "test": {
+      "curved": 16,
+      "random": 22,
+      "straight": 16
+    }
+  },
+  "by_flight_class": {
+    "train": {
+      "attacked": 150,
+      "normal": 102
+    },
+    "validation": {
+      "attacked": 33,
+      "normal": 21
+    },
+    "test": {
+      "attacked": 33,
+      "normal": 21
+    }
+  }
+}

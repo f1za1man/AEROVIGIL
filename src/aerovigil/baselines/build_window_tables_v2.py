@@ -178,7 +178,7 @@ def run(sources=("orig",), limit=None, output_dir=None):
         tables[name].to_parquet(out / f"windows_{name}.parquet", index=False)
         print(f"  dropped windows: {dropped_all}")
     pd.Series(features, name="feature").to_csv(out / "feature_names.csv", index=False)
-    report(tables, features, out, time.time() - started), bool(limit))
+    report(tables, features, out, time.time() - started, bool(limit))
     return tables
 
 

@@ -50,6 +50,9 @@ def main():
     rate = fcfg["rate_hz"]
 
     report = pd.read_csv(resolve(cfg["paths"]["cleaning_report"]))
+    if "attack_rows" not in report.columns:  # Module 03 v2 report
+        report = report.rename(columns={"mission": "mission_type"})
+        report["attack_rows"] = report["attacked"].astype(int)
     man = pd.read_csv(resolve(cfg["paths"]["attack_manifest"]))
     split_map, _, _ = load_split_map(resolve(cfg["paths"]["flight_splits"]))
 
@@ -125,7 +128,7 @@ def main():
         f"Standardiser centre {np.round(mu, 3).tolist()} scale {np.round(sd, 3).tolist()}"
     )
 
-    h_grid = np.geomspace(1.0, 2000.0, 90)
+    h_grid = np.geomspace(1.0, 100000.0, 140)
     cusum_cal = {}
     for k in dcfg["cusum_k_grid"]:
         counts = cusum_alarm_counts(

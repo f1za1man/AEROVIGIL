@@ -158,9 +158,15 @@ def filter_segment(seg, fcfg, noise_scale=1.0, use_imu=True):
 
 def run_flight(g, cols, fcfg, conv, scale, noise_scale=1.0, truth=None):
     """Return one row per filter tick with innovations, NIS, estimates and labels.
-
     truth: optional dict with per-row arrays 'label', 'offset_e', 'offset_n', 'offset_m',
     'rel_start' taken from the attacked flight (ground truth, never a filter input)."""
+    if "aligned_all" in g.columns and not g["aligned_all"].all():
+        # Module 03 v2 keeps rows where the IMU or barometer dropped out, as NaN.
+        # The filter cannot carry a NaN, so those rows come out before anything else.
+        keep = g["aligned_all"].to_numpy() == 1
+        g = g[keep].reset_index(drop=True)
+        if truth is not None:
+            truth = {k: v[keep] for k, v in truth.items()}
     use_imu = conv is not None
     frames = []
     for seg in prepare_ticks(g, cols, fcfg, conv, scale):

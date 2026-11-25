@@ -3,12 +3,12 @@
 
 paths:
   preprocessing_config: configs/preprocessing/preprocessing.yaml
-  cleaning_report: data/processed/module03/cleaning_report.csv
-  cleaned_dir: data/processed/module03/cleaned
   flight_splits: data/interim/module03/flight_splits.csv
-  attack_manifest: data/processed/module04/attack_manifest.csv
-  attacked_dir: data/processed/module04/attacked
   output_dir: data/processed/module06
+  cleaning_report: data/interim/module03_v2/base_report.csv
+  cleaned_dir: data/processed/module03_v2/base
+  attack_manifest: data/interim/module04_v2/attack_manifest_v2.csv
+  attacked_dir: data/processed/module04_v2/base
 
 columns:                                   # IMU columns (the rest come from preprocessing.yaml)
   accel: [linear_acceleration_x, linear_acceleration_y, linear_acceleration_z]

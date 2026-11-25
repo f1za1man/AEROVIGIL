@@ -116,6 +116,28 @@ def test_consistent_speed_follows_the_components_and_keeps_source_noise(three_d)
     assert (out.velocity[on] - g.velocity[on]).abs().max() > 0.5
 
 
+def test_consistent_mode_eases_the_offset_in_and_never_steps_the_velocity():
+    g = fake_flight("N")
+    out, _ = inject(g, spec("linear_drift", DRIFT), "consistent", "A")
+    on = out.attack_label == 1
+    delta = out.velocity_north - g.velocity_north
+    assert abs(delta[on].iloc[0]) < 1e-6  # a step would start at the full rate
+    assert delta[on].diff().abs().max() < 0.2  # and no later sample jumps either
+    t = g["t_s"]
+    half = (t - 30.0 - 0.75).abs().idxmin()  # halfway through the 1.5 s ease-in
+    assert out["offset_m"].iloc[half] == pytest.approx(0.375, abs=0.02)
+    late = (t > 40) & (t <= 70)
+    assert np.allclose(out.loc[late, "offset_m"], (t - 30.0)[late], atol=0.01)
+
+
+def test_abrupt_jump_consistent_now_differs_from_position_only():
+    g = fake_flight("N")
+    po, _ = inject(g, spec("abrupt_jump", JUMP), "position_only", "A")
+    cv, _ = inject(g, spec("abrupt_jump", JUMP), "consistent", "B")
+    assert not np.allclose(po["offset_m"], cv["offset_m"])
+    assert cv["velocity_east"].sub(g["velocity_east"]).abs().max() > 1.0
+
+
 def test_label_is_the_window_and_truth_follows_the_offset():
     g = fake_flight("N")
     out, _ = inject(g, spec("linear_drift", DRIFT), "position_only", "A")

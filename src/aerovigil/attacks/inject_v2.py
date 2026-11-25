@@ -12,7 +12,11 @@ What changes against Module 04 v1:
   * attack_label is still the injected window, but spoof_truth marks where the
     offset really is >= 1 m. The manifest keeps peak_offset_m, onset_s and spoof_end_s;
   * velocity_mode consistent also moves the scalar speed column, keeping the
-    source flight's own speed noise.
+    source flight's own speed noise, and eases the whole offset in over
+    ONSET_RAMP_S seconds so the reported velocity never steps. A step at onset is
+    a giveaway no careful spoofer would leave, and the Kalman filter in Module 06
+    detects it in a single sample, which made the stealth frontier measure the
+    switch-on rather than the drift.
 
 This file holds the injector itself; generate_v2.py runs it over all flights.
 """
@@ -29,6 +33,7 @@ from aerovigil.data.build_raw_base import (
 from aerovigil.features.imu_consistency import IMU_INPUTS
 
 EDGE_TOL_S = 1e-6
+ONSET_RAMP_S = 1.5
 MODES = ("position_only", "consistent")
 SHORT = {"position_only": "po", "consistent": "cv"}
 KEEP = [
@@ -45,6 +50,13 @@ TRUTH = [
     "spoof_offset_east_m", "offset_rate_mps", "offset_m", "spoof_truth", "phase",
     "seconds_since_onset",
 ]  # fmt: skip
+
+
+def smooth_start(tau, seconds):
+    """Smoothstep weight and its time derivative: 0 at tau=0, 1 after `seconds`,
+    flat at both ends, so neither the offset nor its rate jumps at onset."""
+    x = np.clip(tau / seconds, 0.0, 1.0)
+    return x * x * (3.0 - 2.0 * x), 6.0 * x * (1.0 - x) / seconds
 
 
 def speed_uses_3d(g):
@@ -68,6 +80,12 @@ def inject(g, spec, mode, new_id):
         n[active], e[active], dn[active], de[active] = offset_profile(
             spec["attack_type"], tau[active], spec["params"]
         )
+        if mode == "consistent":
+            w, dw = smooth_start(tau[active], ONSET_RAMP_S)
+            dn[active] = dn[active] * w + n[active] * dw
+            de[active] = de[active] * w + e[active] * dw
+            n[active] = n[active] * w
+            e[active] = e[active] * w
     out = g.copy()
     lat0, lon0 = g["latitude_deg"].to_numpy(float), g["longitude_deg"].to_numpy(float)
     out["latitude_deg"] = lat0 + n / METRES_PER_DEGREE

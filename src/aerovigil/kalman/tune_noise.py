@@ -45,6 +45,9 @@ def main():
     tcfg, fcfg = cfg["noise_tuning"], cfg["filter"]
 
     report = pd.read_csv(resolve(cfg["paths"]["cleaning_report"]))
+    if "attack_rows" not in report.columns:  # Module 03 v2 report
+        report = report.rename(columns={"mission": "mission_type"})
+        report["attack_rows"] = report["attacked"].astype(int)
     split_map, _, _ = load_split_map(resolve(cfg["paths"]["flight_splits"]))
     pool = report[
         (report["attack_rows"] == 0)

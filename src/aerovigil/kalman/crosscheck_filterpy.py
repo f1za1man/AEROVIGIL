@@ -46,6 +46,9 @@ def main():
     fcfg, conv, noise = cfg["filter"], load_convention(cfg), load_noise_scale(cfg)
     r_h, _ = noise_matrices(fcfg, noise)
     report = pd.read_csv(resolve(cfg["paths"]["cleaning_report"]))
+    if "attack_rows" not in report.columns:  # Module 03 v2 report
+        report = report.rename(columns={"mission": "mission_type"})
+        report["attack_rows"] = report["attacked"].astype(int)
     files = report.loc[report["attack_rows"] == 0, "file"].sample(3, random_state=0)
 
     print("=" * 65)

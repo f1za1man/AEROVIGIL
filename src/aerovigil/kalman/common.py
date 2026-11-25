@@ -46,8 +46,8 @@ def truth_arrays(g):
         "label": g["attack_label"].to_numpy(float),
         "offset_e": g["spoof_offset_east_m"].to_numpy(float),
         "offset_n": g["spoof_offset_north_m"].to_numpy(float),
-        "offset_m": g["spoof_offset_m"].to_numpy(float),
-        "rel_start": g["time_from_attack_start_s"].to_numpy(float),
+        "offset_m": g["offset_m"].to_numpy(float),
+        "rel_start": g["seconds_since_onset"].to_numpy(float),
     }
 
 

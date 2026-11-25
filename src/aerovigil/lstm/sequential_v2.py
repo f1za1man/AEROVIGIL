@@ -10,12 +10,27 @@ carries evidence from the whole flight, while the LSTM looks at 5 s and forgets.
 So this file gives the LSTM the same memory, with the same decision rule Module 06
 used: a one-sided CUSUM over the window scores of a flight. Each score is standardised
 by the calibration pool's median and MAD, a slack k is subtracted, and the running sum
-alarms when it passes h. k and h are chosen on the calibration flights at the shared
-1 alarm per flight-hour budget, so the comparison against Module 06 and against the
-single-window latch is at equal cost.
+alarms when it passes h, chosen on the calibration flights at the shared 1 alarm per
+flight-hour budget.
+
+The plain CUSUM does not survive that calibration. A sum that never forgets grows with
+flight length, and these flights run from 46 s (straight) to 265 s (curved), so one h
+cannot fit both: the first run calibrated to 2 alarms in 1.59 h of calibration flight
+and then fired 9 to 14 alarms per hour on the normal test flights. The statistic is not
+stationary, so the budget does not transfer and the detection numbers it buys are not
+comparable with Module 06's.
+
+The fix is a decay: acc <- max(0, decay * acc + z - k). A decay below 1 gives the sum a
+finite memory of about 1 / (1 - decay) windows, which makes it stationary while still
+accumulating a slow drift across far more than one window. decay 1.0 is kept in the
+grid so the non-stationary case stays visible in the output.
+
+Every detection number in the tables is printed next to the false-alarm rate it cost,
+because a detector that is over budget has not beaten anything.
 
 Reads the scores train_v2.py wrote. Writes sequential_frontier.csv,
-sequential_flights.csv and sequential_thresholds.csv in data/processed/module07_v2
+sequential_flights.csv, sequential_cost.csv and sequential_thresholds.csv in
+data/processed/module07_v2
 
 Usage:
     python src\aerovigil\lstm\sequential_v2.py
@@ -38,16 +53,19 @@ from aerovigil.lstm.evaluate_v2 import (
 from aerovigil.lstm.train_v2 import load
 
 K_GRID = (0.25, 0.5, 1.0)
-H_GRID = tuple(np.geomspace(0.5, 20000.0, 120))
+DECAY_GRID = (1.0, 0.97, 0.90)
+H_GRID = tuple(np.geomspace(0.2, 20000.0, 130))
 REFRACTORY_S = 10.0
+RATES = (0.05, 0.10, 0.25, 0.50, 1.00)
+MODULE06 = {0.05: 0.05, 0.10: 0.05, 0.25: 0.57, 0.50: 1.00, 1.00: 1.00}
 
 
-def cusum(z, k):
-    """One-sided CUSUM of a standardised score: max(0, previous + z - k)."""
+def cusum(z, k, decay=1.0):
+    """One-sided CUSUM with a finite memory: max(0, decay * previous + z - k)."""
     out = np.empty(len(z))
     acc = 0.0
     for i, v in enumerate(z):
-        acc = max(0.0, acc + v - k)
+        acc = max(0.0, decay * acc + v - k)
         out[i] = acc
     return out
 
@@ -59,7 +77,7 @@ def standardise(score, pool):
     return (score - med) / max(1.4826 * mad, 1e-9)
 
 
-def flight_cusum(z, meta, k):
+def flight_cusum(z, meta, k, decay=1.0):
     """CUSUM of every flight, in window order, returned in the table's own order."""
     out = np.zeros(len(z))
     order = meta.sort_values(["flight_id", "window_start_s"]).index.to_numpy()
@@ -67,7 +85,7 @@ def flight_cusum(z, meta, k):
     starts = np.flatnonzero(np.r_[True, fids[1:] != fids[:-1]])
     for a, b in zip(starts, np.r_[starts[1:], len(order)]):
         idx = order[a:b]
-        out[idx] = cusum(z[idx], k)
+        out[idx] = cusum(z[idx], k, decay)
     return out
 
 
@@ -94,6 +112,7 @@ def calibrate(series, meta, pool, budget):
         (series[g.index.to_numpy()], g["window_end_s"].to_numpy())
         for _, g in sub.groupby("flight_id", sort=False)
     ]
+    used = None
     for h in H_GRID:
         used = sum(count_alarms(s, t, h)[0] for s, t in groups)
         if used <= allowed:
@@ -103,13 +122,12 @@ def calibrate(series, meta, pool, budget):
 
 def evaluate(series, meta, h):
     """Per test flight: first alarm after the measured onset, delay, alarms per hour."""
-    test = (meta["role"] == "test").to_numpy()
-    sub = meta.loc[test]
+    sub = meta.loc[(meta["role"] == "test").to_numpy()]
     rows, normal_alarms, normal_windows = [], 0, 0
     for fid, g in sub.groupby("flight_id", sort=False):
         g = g.sort_values("window_start_s")
         idx = g.index.to_numpy()
-        n, first = count_alarms(series[idx], g["window_end_s"].to_numpy(), h)
+        n, _ = count_alarms(series[idx], g["window_end_s"].to_numpy(), h)
         attacked = g["attack_type"].iloc[0] != "none"
         since = g["seconds_since_onset_end"].to_numpy()
         after = np.flatnonzero((series[idx] > h) & (since >= 0)) if attacked else []
@@ -148,77 +166,119 @@ def run(output_dir=None, budget=BUDGET_PER_HOUR):
         f"Models {len(idx)}   calibration windows {int(pool.sum()):,} "
         f"({hours(int(pool.sum())):.2f} h)   budget {budget:g} alarm/h"
     )
-    flights, thresholds = [], []
+    print(f"k {list(K_GRID)}   decay {list(DECAY_GRID)}   ({len(idx)} models)\n")
+    flights, thresholds, done = [], [], 0
     for _, r in idx.iterrows():
         if r["protocol"] == "unseen" and r["held_out"] != "linear_drift":
             continue  # the sweep is a linear drift: only that hold-out is honest on it
         z = standardise(np.load(sdir / f"{r['name']}.npy"), pool)
         for k in K_GRID:
-            series = flight_cusum(z, meta, k)
-            h, allowed, used = calibrate(series, meta, pool, budget)
-            fl, rate = evaluate(series, meta, h)
-            fl.insert(0, "seed", r["seed"])
-            fl.insert(0, "k", k)
-            fl.insert(0, "detector", detector_of(r))
-            flights.append(fl)
-            thresholds.append({
-                "name": r["name"], "detector": detector_of(r), "seed": r["seed"],
-                "k": k, "h": h, "allowed_alarms": allowed, "alarms_used": used,
-                "alarms_per_hour_test": rate,
-            })  # fmt: skip
-            sw = fl[(fl["attack_set"] == "sweep") & (fl["drift_rate_mps"] <= 0.25)]
-            print(
-                f"  {r['name']:34s} k={k:<5g} h={h:7.2f}  "
-                f"{rate:.2f} alarms/h on test normals   "
-                f"detected {sw['detected'].mean() if len(sw) else np.nan:.2f} "
-                f"at 0.25 m/s and below"
-            )
+            for decay in DECAY_GRID:
+                series = flight_cusum(z, meta, k, decay)
+                h, allowed, used = calibrate(series, meta, pool, budget)
+                fl, rate = evaluate(series, meta, h)
+                fl.insert(0, "seed", r["seed"])
+                fl.insert(0, "decay", decay)
+                fl.insert(0, "k", k)
+                fl.insert(0, "detector", detector_of(r))
+                flights.append(fl)
+                thresholds.append({
+                    "name": r["name"], "detector": detector_of(r), "seed": r["seed"],
+                    "k": k, "decay": decay, "h": h, "allowed_alarms": allowed,
+                    "alarms_used": used, "alarms_per_hour_test": rate,
+                })  # fmt: skip
+                done += 1
+        print(f"  {r['name']:34s} {done:3d} fits done")
     fl = pd.concat(flights, ignore_index=True)
     fl.to_csv(out / "sequential_flights.csv", index=False)
-    pd.DataFrame(thresholds).to_csv(out / "sequential_thresholds.csv", index=False)
+    thr = pd.DataFrame(thresholds)
+    thr.to_csv(out / "sequential_thresholds.csv", index=False)
     sweep = fl[fl["attack_set"] == "sweep"]
-    frontier = by_seed(sweep[sweep["attacked"]], ["detector", "k", "drift_rate_mps"])
+    keys = ["detector", "k", "decay", "drift_rate_mps"]
+    frontier = by_seed(sweep[sweep["attacked"]], keys)
     frontier.to_csv(out / "sequential_frontier.csv", index=False)
-    report(fl, frontier, out)
-    return fl, frontier
+    cost = cost_table(frontier, thr, budget)
+    cost.to_csv(out / "sequential_cost.csv", index=False)
+    report(fl, frontier, cost, budget, out)
+    return fl, frontier, cost
 
 
-def report(fl, frontier, out):
-    pd.set_option("display.width", 220)
-    print("\nSEQUENTIAL STEALTH FRONTIER: detection rate per drift rate")
-    print(
-        frontier.pivot_table(
-            index="drift_rate_mps", columns=["detector", "k"], values="detection_rate"
+def cost_table(frontier, thr, budget):
+    """Detection per drift rate next to the false-alarm rate it cost."""
+    det = frontier.pivot_table(
+        index=["detector", "k", "decay"], columns="drift_rate_mps",
+        values="detection_rate",
+    )  # fmt: skip
+    det = det[[c for c in RATES if c in det.columns]]
+    det.columns = [f"det_{c:g}" for c in det.columns]
+    rate = (
+        thr.groupby(["detector", "k", "decay"])["alarms_per_hour_test"]
+        .mean()
+        .rename("alarms_per_hour")
+    )
+    table = det.join(rate).reset_index()
+    table["within_budget"] = table["alarms_per_hour"] <= budget + 1e-9
+    beats = [c for c in table.columns if c.startswith("det_")]
+    if len(beats) < len(RATES):  # a partial sweep cannot be compared with Module 06
+        table["beats_module06"] = False
+        return table.sort_values(["detector", "k", "decay"])
+    table["beats_module06"] = [
+        all(
+            row[f"det_{r:g}"] >= MODULE06[r]
+            for r in RATES
+            if f"det_{r:g}" in beats and np.isfinite(row[f"det_{r:g}"])
         )
-        .round(3)
-        .to_string()
-    )
-    print("\nMEDIAN DELAY (s) from the measured onset")
+        for _, row in table.iterrows()
+    ]
+    return table.sort_values(["detector", "k", "decay"])
+
+
+def report(fl, frontier, cost, budget, out):
+    pd.set_option("display.width", 240)
     print(
-        frontier.pivot_table(
-            index="drift_rate_mps", columns=["detector", "k"], values="median_delay_s"
+        "\nCOST AND DETECTION (det_* is the detection rate at that drift rate in m/s)"
+    )
+    print(cost.round(3).to_string(index=False))
+    print(f"\nModule 06's chi-square test, at the same {budget:g} alarm/h budget:")
+    print("  " + "  ".join(f"det_{r:g}={MODULE06[r]:.2f}" for r in RATES))
+    ok = cost[cost["within_budget"]]
+    print(f"\n{len(ok)} of {len(cost)} settings stayed inside the budget.")
+    if len(ok):
+        print("Of those, the strongest at 0.25 m/s and below:")
+        best = ok.sort_values(["det_0.25", "det_0.1"], ascending=False).head(5)
+        print(best.round(3).to_string(index=False))
+    if ok["beats_module06"].any():
+        print("\nSettings that match or beat Module 06 at every rate, within budget:")
+        print(ok[ok["beats_module06"]].round(3).to_string(index=False))
+    else:
+        print("\nNo setting within budget matches Module 06 at every rate.")
+    good = set(map(tuple, ok[["detector", "k", "decay"]].to_numpy()))
+    sub = frontier[
+        [tuple(x) in good for x in frontier[["detector", "k", "decay"]].to_numpy()]
+    ]
+    if len(sub):
+        print("\nMEDIAN DELAY (s) from the measured onset, within-budget settings only")
+        print(
+            sub.pivot_table(
+                index="drift_rate_mps",
+                columns=["detector", "k", "decay"],
+                values="median_delay_s",
+            )  # fmt: skip
+            .round(1)
+            .to_string()
         )
-        .round(1)
-        .to_string()
-    )
-    print("\nFor comparison, the single-window latch and Module 06's chi-square test:")
-    ref = pd.DataFrame(
-        {
-            "module06_chi2": [0.05, 0.05, 0.57, 1.00, 1.00, 1.00, 1.00],
-            "lstm_ae_window": [0.048, 0.048, 0.048, 0.048, 0.111, 1.000, 1.000],
-            "lstm_sup_window": [0.016, 0.016, 0.143, 0.603, 0.873, 0.984, 1.000],
-        },
-        index=[0.05, 0.10, 0.25, 0.50, 1.00, 2.00, 5.00],
-    )
-    ref.index.name = "drift_rate_mps"
-    print(ref.to_string())
     main = fl[fl["attack_set"] != "sweep"]
-    print("\nDETECTION ON THE MAIN ATTACK SET (velocity mode is where it was weak)")
-    print(
-        by_seed(main[main["attacked"]], ["detector", "k", "velocity_mode"])
-        .round(3)
-        .to_string(index=False)
-    )
+    keep = [tuple(x) in good for x in main[["detector", "k", "decay"]].to_numpy()]
+    main = main[keep]
+    if len(main):
+        print(
+            "\nMAIN ATTACK SET, within-budget settings (velocity mode was the weak case)"
+        )
+        print(
+            by_seed(main[main["attacked"]], ["detector", "k", "decay", "velocity_mode"])
+            .round(3)
+            .to_string(index=False)
+        )
     print(f"\nSaved to {out}")
 
 

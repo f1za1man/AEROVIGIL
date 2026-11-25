@@ -35,6 +35,16 @@ def test_cusum_accumulates_small_excesses_and_cannot_go_negative():
     assert sq.cusum(np.r_[np.full(5, 2.0), np.full(5, -9.0)], 0.5)[-1] == 0.0
 
 
+def test_a_decay_bounds_the_sum_so_it_stops_growing_with_flight_length():
+    z = np.full(400, 0.3)
+    plain = sq.cusum(z, 0.1, 1.0)
+    decayed = sq.cusum(z, 0.1, 0.9)
+    assert plain[-1] == pytest.approx(0.2 * 400)  # grows without limit
+    assert decayed[-1] == pytest.approx(0.2 / (1 - 0.9), rel=1e-3)  # settles
+    assert decayed[-1] == pytest.approx(decayed[200])  # same at any flight length
+    assert decayed.max() < plain.max() / 10
+
+
 def test_standardise_uses_the_calibration_pool_only():
     score = np.r_[np.zeros(50), np.full(10, 100.0)]
     pool = np.r_[np.ones(50, bool), np.zeros(10, bool)]
@@ -112,21 +122,44 @@ def fake_project(root, n_calib=6, n_test=4, n_windows=30, rates=(0.05, 1.0)):
     return meta
 
 
-def test_run_writes_the_frontier_for_every_k_and_rate(tmp_path):
+def test_run_covers_every_k_and_decay_and_prices_each_one(tmp_path):
     fake_project(tmp_path)
-    flights, frontier = sq.run(output_dir=tmp_path)
+    flights, frontier, cost = sq.run(output_dir=tmp_path)
     assert set(frontier["k"]) == set(sq.K_GRID)
+    assert set(frontier["decay"]) == set(sq.DECAY_GRID)
     assert set(frontier["drift_rate_mps"]) == {0.05, 1.0}
     assert frontier["detection_rate"].between(0, 1).all()
     thr = pd.read_csv(tmp_path / "sequential_thresholds.csv")
     assert (thr["alarms_used"] <= thr["allowed_alarms"]).all()
-    assert len(thr) == len(sq.K_GRID)
+    assert len(thr) == len(sq.K_GRID) * len(sq.DECAY_GRID)
     fast = frontier[frontier["drift_rate_mps"] == 1.0]["detection_rate"].mean()
     slow = frontier[frontier["drift_rate_mps"] == 0.05]["detection_rate"].mean()
     assert fast >= slow  # a stronger drift is never harder to catch
-    for name in ("sequential_flights.csv", "sequential_frontier.csv"):
+    assert len(cost) == len(sq.K_GRID) * len(sq.DECAY_GRID)
+    assert {"alarms_per_hour", "within_budget", "det_0.05"} <= set(cost.columns)
+    assert cost["within_budget"].eq(cost["alarms_per_hour"] <= 1.0 + 1e-9).all()
+    for name in ("sequential_flights.csv", "sequential_frontier.csv",
+                 "sequential_cost.csv"):  # fmt: skip
         assert (tmp_path / name).is_file()
     assert len(flights) > 0
+
+
+def test_a_plain_sum_does_not_transfer_from_short_flights_to_long_ones():
+    """Why the first run over-alarmed: these flights run from 46 s to 265 s."""
+    rng = np.random.default_rng(1)
+
+    def peak(n_windows, decay, reps=40):
+        runs = [
+            sq.cusum(rng.normal(0.7, 1.0, n_windows), 0.5, decay).max()
+            for _ in range(reps)
+        ]
+        return float(np.median(runs))
+
+    plain = peak(200, 1.0) / peak(20, 1.0)
+    decayed = peak(200, 0.9) / peak(20, 0.9)
+    assert plain > 4.0  # a threshold set on short flights is far too low for long ones
+    assert decayed < 2.5
+    assert decayed < plain / 2
 
 
 def test_calibration_and_evaluation_respect_the_budget(monkeypatch):

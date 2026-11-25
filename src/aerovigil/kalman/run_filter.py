@@ -83,7 +83,7 @@ def main():
     print("=" * 65)
     print(f"IMU convention: {conv if conv else 'NONE (constant-velocity model)'}")
     print(
-        f"Noise scale   : {noise:.4f} | filter rate {fcfg['rate_hz']} Hz | warm-up {fcfg['warmup_s']} s"
+        f"Noise scale   : {noise} | filter rate {fcfg['rate_hz']} Hz | warm-up {fcfg['warmup_s']} s"
     )
     started, total_ticks, skipped = time.time(), 0, 0
     for name, items in jobs.items():

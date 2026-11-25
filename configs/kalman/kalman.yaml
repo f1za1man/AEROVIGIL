@@ -33,7 +33,7 @@ filter:
   sigma_gps_alt_m: 1.0
   sigma_baro_m: 0.3
   sigma_vu_mps: 0.3
-  sigma_acc: 0.5                           # white acceleration noise (m/s^2)
+  sigma_acc: 0.18                           # white acceleration noise (m/s^2)
   sigma_acc_no_imu: 2.0                    # used only if no IMU convention is accepted
   sigma_bias_walk: 0.02                    # accelerometer-bias random walk
   sigma_baro_bias_walk: 0.05
@@ -42,10 +42,10 @@ filter:
   p0_bias: 0.2
   p0_baro_bias: 2.0
 
-noise_tuning:                              # scales the GPS/baro noise until NIS matches its dof
-  n_flights: 24                            # normal TRAIN flights
-  iterations: 4
-  scale_min: 0.05
+noise_tuning:
+  n_flights: 24
+  iterations: 14
+  scale_min: 0.000001
   scale_max: 50.0
 
 detector:

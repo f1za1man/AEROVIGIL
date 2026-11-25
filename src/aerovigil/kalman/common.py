@@ -36,7 +36,8 @@ def load_noise_scale(cfg):
     info = load_json(out_dir(cfg) / "filter_noise.json")
     if info is None:
         raise SystemExit("Run tune_noise.py first (filter_noise.json is missing).")
-    return float(info["scale"])
+    s = info["scale"]
+    return {k: float(v) for k, v in s.items()} if isinstance(s, dict) else float(s)
 
 
 def truth_arrays(g):

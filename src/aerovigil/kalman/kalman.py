@@ -72,8 +72,18 @@ H_VERTICAL = np.array(
 
 
 def noise_matrices(fcfg, scale=1.0):
-    """Measurement noise; `scale` multiplies the variances (set by tune_noise.py)."""
-    r_h = np.diag([fcfg["sigma_pos_m"] ** 2, fcfg["sigma_vel_mps"] ** 2]) * scale
+    """Measurement noise; `scale` multiplies the variances (set by tune_noise.py).
+    A float scales every channel; a dict scales horizontal position, horizontal
+    velocity and the vertical channel separately, because on this data they need
+    corrections that differ by more than an order of magnitude."""
+    s = (
+        scale
+        if isinstance(scale, dict)
+        else {"pos": scale, "vel": scale, "vert": scale}
+    )
+    r_h = np.diag(
+        [fcfg["sigma_pos_m"] ** 2 * s["pos"], fcfg["sigma_vel_mps"] ** 2 * s["vel"]]
+    )
     r_v = (
         np.diag(
             [
@@ -82,6 +92,6 @@ def noise_matrices(fcfg, scale=1.0):
                 fcfg["sigma_vu_mps"] ** 2,
             ]
         )
-        * scale
+        * s["vert"]
     )
     return r_h, r_v

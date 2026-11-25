@@ -33,6 +33,7 @@ from aerovigil.kalman.pipeline import run_flight  # noqa: E402
 
 MEDIAN_CHI2_4 = 3.3567
 MEDIAN_CHI2_3 = 2.3660
+W_COLS = ["w_pos_e", "w_vel_e", "w_pos_n", "w_vel_n"]
 
 
 def main():
@@ -68,32 +69,48 @@ def main():
             if r is not None:
                 parts.append(r[r["valid"]])
         d = pd.concat(parts)
-        return d, float(np.median(d["nis_h"])), float(np.median(d["nis_v"]))
+        std = {c: float(d[c].std()) for c in W_COLS}
+        return d, float(np.median(d["nis_h"])), float(np.median(d["nis_v"])), std
 
-    scale, history = 1.0, []
+    def step(scale, std, med_v):
+        """One damped step towards whitened std 1.0 and vertical NIS 2.37."""
+
+        def clip(v):
+            return float(np.clip(v, tcfg["scale_min"], tcfg["scale_max"]))
+
+        pos = 0.5 * (std["w_pos_e"] + std["w_pos_n"])
+        vel = 0.5 * (std["w_vel_e"] + std["w_vel_n"])
+        return {
+            "pos": clip(scale["pos"] * max(pos, 1e-6) ** 1.6),
+            "vel": clip(scale["vel"] * max(vel, 1e-6) ** 1.6),
+            "vert": clip(scale["vert"] * (med_v / MEDIAN_CHI2_3) ** 0.8),
+        }
+
+    scale = {"pos": 1.0, "vel": 1.0, "vert": 1.0}
+    history = []
     for it in range(tcfg["iterations"] + 1):
-        d, med_h, med_v = run_all(scale)
+        d, med_h, med_v, std = run_all(scale)
         history.append(
             {
                 "iteration": it,
-                "scale": scale,
+                **{f"scale_{k}": v for k, v in scale.items()},
                 "median_nis_h": med_h,
                 "median_nis_v": med_v,
+                **std,
             }
         )
         print(
-            f"  iteration {it}: scale {scale:8.3f} | median NIS horizontal {med_h:6.2f} "
-            f"(target {MEDIAN_CHI2_4:.2f}) | vertical {med_v:5.2f} (target {MEDIAN_CHI2_3:.2f})"
+            f"  iteration {it}: pos {scale['pos']:.2e} vel {scale['vel']:.2e} "
+            f"vert {scale['vert']:.2e} | NIS h {med_h:5.2f} v {med_v:5.2f} "
+            f"| whitened pos {0.5 * (std['w_pos_e'] + std['w_pos_n']):.2f} "
+            f"vel {0.5 * (std['w_vel_e'] + std['w_vel_n']):.2f}"
         )
         if it == tcfg["iterations"]:
             break
-        scale = float(
-            np.clip(
-                scale * (med_h / MEDIAN_CHI2_4) ** 0.8,
-                tcfg["scale_min"],
-                tcfg["scale_max"],
-            )
-        )
+        scale = step(scale, std, med_v)
+    print(
+        f"\nTargets: NIS h {MEDIAN_CHI2_4:.2f}, NIS v {MEDIAN_CHI2_3:.2f}, whitened 1.00"
+    )
 
     white_std = d[["w_pos_e", "w_vel_e", "w_pos_n", "w_vel_n"]].std().round(3).to_dict()
     print("\nWhitened-innovation std (1.0 = consistent):", white_std)

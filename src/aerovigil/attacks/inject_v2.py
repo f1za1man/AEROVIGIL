@@ -70,17 +70,24 @@ def speed_uses_3d(g):
     return bool(err3 < err2)
 
 
-def inject(g, spec, mode, new_id):
-    """Return the attacked flight (base schema + truth columns) for one spec and mode."""
+def inject(g, spec, mode, new_id, profile_fn=None):
+    """Return the attacked flight (base schema + truth columns) for one spec and mode.
+
+    profile_fn: an optional callable tau -> (north_m, east_m, d_north, d_east) used
+    instead of the named profile. Module 08's adaptive attacker passes one, and it
+    already eases its own onset, so the fixed ONSET_RAMP_S ease-in is skipped for it.
+    """
     t = g["t_s"].to_numpy(float)
     tau = t - spec["start_s"]
     active = (tau >= 0) & (tau <= spec["duration_s"] + EDGE_TOL_S)
     n, e, dn, de = (np.zeros(len(t)) for _ in range(4))
     if active.any():
-        n[active], e[active], dn[active], de[active] = offset_profile(
-            spec["attack_type"], tau[active], spec["params"]
+        n[active], e[active], dn[active], de[active] = (
+            profile_fn(tau[active])
+            if profile_fn is not None
+            else offset_profile(spec["attack_type"], tau[active], spec["params"])
         )
-        if mode == "consistent":
+        if mode == "consistent" and profile_fn is None:
             w, dw = smooth_start(tau[active], ONSET_RAMP_S)
             dn[active] = dn[active] * w + n[active] * dw
             de[active] = de[active] * w + e[active] * dw

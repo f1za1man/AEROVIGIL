@@ -1,5 +1,4 @@
 """Offset profiles for synthetic GPS-spoofing attacks (AEROVIGIL Module 04).
-
 Every profile returns the spoofed offset in metres (north, east) and its time
 derivative in m/s, as functions of tau = seconds since the attack started.
 Direction convention: 0 deg = north, 90 deg = east.
@@ -14,6 +13,29 @@ ATTACK_TYPES = (
     "exponential_ramp",
     "low_amplitude_wander",
 )
+SATURATION_KNEE = 0.8
+
+
+def _saturate(s, ds, cap, knee=SATURATION_KNEE):
+    """Bend the offset smoothly onto `cap` instead of clipping it.
+
+    The old hard clip set the rate to zero the instant the offset reached the cap.
+    At the cap an exponential ramp is moving at tens of m/s, so that is a step of
+    tens of m/s in one sample: in velocity_mode consistent the reported velocity
+    jumps, and the Kalman filter in Module 06 sees it immediately. The attack then
+    gets detected for switching off, not for spoofing, which is not the thing under
+    test.
+
+    Below knee * cap this is the identity, so profiles that never approach the cap
+    are bit-identical to before. Above it the offset follows a tanh onto the cap and
+    the rate decays to zero continuously, matching value and slope at the knee.
+    """
+    u = s / cap
+    x = np.clip((u - knee) / (1.0 - knee), 0.0, None)
+    bent = cap * (knee + (1.0 - knee) * np.tanh(x))
+    damp = 1.0 - np.tanh(x) ** 2
+    over = u > knee
+    return np.where(over, bent, s), np.where(over, ds * damp, ds)
 
 
 def _unit(direction_deg):
@@ -42,10 +64,8 @@ def _wander(tau, p):
 def offset_profile(attack_type, tau, p):
     """Return (north_m, east_m, d_north_mps, d_east_mps) for tau >= 0."""
     tau = np.asarray(tau, dtype=float)
-
     if attack_type == "low_amplitude_wander":
         return _wander(tau, p)
-
     if attack_type == "abrupt_jump":
         s = np.full_like(tau, p["magnitude_m"])
         ds = np.zeros_like(tau)
@@ -61,11 +81,8 @@ def offset_profile(attack_type, tau, p):
         x = np.minimum(tau / tc, 50.0)
         s = r0 * tc * (np.exp(x) - 1.0)
         ds = r0 * np.exp(x)
-        capped = s >= cap
-        s = np.where(capped, cap, s)
-        ds = np.where(capped, 0.0, ds)
+        s, ds = _saturate(s, ds, cap)
     else:
         raise ValueError(f"Unknown attack type: {attack_type}")
-
     un, ue = _unit(p["direction_deg"])
     return s * un, s * ue, ds * un, ds * ue

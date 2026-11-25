@@ -36,7 +36,7 @@ BOUNDS = {
     "duty": (0.1, 1.0, "lin"),
     "bearing_deg": (0.0, 360.0, "wrap"),
     "jitter_m": (0.0, 2.0, "lin"),
-    "jitter_period_s": (3.0, 30.0, "lin"),
+    "jitter_period_s": (3.0, 60.0, "lin"),
 }
 NAMES = tuple(BOUNDS)
 DEFAULT = {

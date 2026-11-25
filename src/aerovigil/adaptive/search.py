@@ -60,7 +60,8 @@ OUT_DIR = ROOT / "data" / "processed" / "module08"
 SEED = 42
 EVALS = 60
 FREE_EVALS = 120
-SEARCH_FLIGHTS = 3
+SEARCH_FLIGHTS = 5
+RATE_TOLERANCE = 0.10
 STEP0 = 0.25
 STEP_UP, STEP_DOWN = 1.3, 0.85
 STEP_MIN = 0.01
@@ -70,8 +71,6 @@ MODULE06 = {0.05: 0.05, 0.10: 0.05, 0.25: 0.57, 0.50: 1.00,
             1.00: 1.00, 2.00: 1.00, 5.00: 1.00}  # fmt: skip
 PLAIN_ONSET_S = 1.5  # Module 04's own ONSET_RAMP_S, for the self-test
 SELFTEST_TOLERANCE = 0.20  # detection-rate gap above which the oracle is suspect
-# the free parameters of the constrained search: rate_mps is set by the constraint
-CONSTRAINED = tuple(n for n in NAMES if n != "rate_mps")
 
 
 def normal_flights(split, limit=None):
@@ -80,8 +79,8 @@ def normal_flights(split, limit=None):
     splits = pd.read_csv(SPLITS).set_index("flight_id")["split"].to_dict()
     rep = rep[(rep["attacked"] == 0) & (rep["flight_id"].map(splits) == split)]
     if limit:
-        rep = rep.groupby("mission", group_keys=False).head(max(1, limit // 3))
-        rep = rep.head(limit)
+        per = -(-limit // rep["mission"].nunique())  # ceiling, so limit is reachable
+        rep = rep.groupby("mission", group_keys=False).head(per).head(limit)
     out = []
     for _, r in rep.iterrows():
         path = M03_BASE / r["file"]
@@ -117,6 +116,29 @@ def probe(oracle, flights, params, mode="consistent", named=None):
                      **oracle(g, fn, mode, kind, kparams)})  # fmt: skip
     frame = pd.DataFrame(rows)
     return float(frame["score"].mean()), frame
+
+
+def achieved_mean(frame):
+    """Median measured mean drift speed over the attack window, across flights."""
+    return float(frame["achieved_mean_mps"].median())
+
+
+def constrained_objective(oracle, flights, params, target, mode,
+                          tol=RATE_TOLERANCE):  # fmt: skip
+    """Displacement, damped when the MEASURED mean speed misses the target.
+
+    The earlier version pinned rate_mps x duty to the target, which the search gamed:
+    it drove duty to its floor and the period past the flight length, so the attack
+    became one long burst whose real mean speed was six times the target while the
+    formula still read correct. Flights run 46 to 265 s, so a cycle longer than that
+    never cycles. Constraining the measured displacement rate instead cannot be gamed,
+    and it is the quantity Module 06's sweep rates refer to.
+    """
+    _, frame = probe(oracle, flights, params, mode)
+    got = achieved_mean(frame)
+    off = (got - target) / max(tol * target, 1e-9)
+    damp = float(np.exp(-0.5 * off * off))
+    return float(frame["score"].mean() * damp), frame
 
 
 def hill_climb(evaluate, rng, evals, x0, step0=STEP0, free=None):
@@ -240,7 +262,10 @@ def run(evals=EVALS, free_evals=FREE_EVALS, search_flights=SEARCH_FLIGHTS,
         f"Practice flights {len(practice)} (validation)   "
         f"exam flights {len(exam)} (test)   velocity mode {mode}"
     )
-    print(f"Probes: {len(rates)} x {evals} constrained + {free_evals} free\n")
+    print(
+        f"Probes: {len(rates)} x {evals} constrained + {free_evals} free   "
+        f"mean speed measured over the attack window, +/-{RATE_TOLERANCE:.0%}\n"
+    )
     started, probes, best, rows = time.time(), [], {}, []
     warm = None
     trusted = True
@@ -250,22 +275,25 @@ def run(evals=EVALS, free_evals=FREE_EVALS, search_flights=SEARCH_FLIGHTS,
     for rate in rates:
 
         def evaluate(params, rate=rate):
-            return probe(oracle, practice, with_mean_rate(params, rate), mode)
+            return constrained_objective(oracle, practice, params, rate, mode)
 
         # warm start: neighbouring rates want similar onsets and duty cycles, so the
         # previous solution is a far better starting point than the default
         x0 = to_unit(with_mean_rate(warm or DEFAULT, rate))
-        params, score, hist = hill_climb(evaluate, rng, evals, x0, free=CONSTRAINED)
+        params, score, hist = hill_climb(evaluate, rng, evals, x0)
         warm = params
-        params = with_mean_rate(params, rate)
         hist.insert(0, "search", f"mean_rate={rate:g}")
         probes.append(hist)
         best[f"mean_rate={rate:g}"] = params
         summary, _ = evaluate_on(oracle, exam, params, mode)
-        achieved = mean_rate(params)
+        _, exam_frame_c = probe(oracle, exam, params, mode)
+        achieved = achieved_mean(exam_frame_c)
         rows.append({"search": "constrained", "mean_rate_mps": rate,
                      "achieved_mean_mps": achieved,
-                     "constraint_met": bool(abs(achieved - rate) <= 0.1 * rate),
+                     "formula_mean_mps": mean_rate(params),
+                     "constraint_met": bool(
+                         abs(achieved - rate) <= RATE_TOLERANCE * rate
+                     ),
                      "burst_s": burst_seconds(params),
                      "practice_score_m": score, **summary,
                      "module06_detection_rate": MODULE06.get(rate, np.nan),
@@ -287,7 +315,8 @@ def run(evals=EVALS, free_evals=FREE_EVALS, search_flights=SEARCH_FLIGHTS,
     best["free"] = params
     summary, exam_frame = evaluate_on(oracle, exam, params, mode)
     rows.append({"search": "free", "mean_rate_mps": np.nan,
-                 "achieved_mean_mps": mean_rate(params), "constraint_met": True,
+                 "achieved_mean_mps": achieved_mean(exam_frame),
+                 "formula_mean_mps": mean_rate(params), "constraint_met": True,
                  "burst_s": burst_seconds(params),
                  "practice_score_m": score, **summary,
                  "module06_detection_rate": np.nan, **params})  # fmt: skip
@@ -315,6 +344,7 @@ def report(frontier, oracle, out, elapsed, trusted=True):
     table = con[[
         "mean_rate_mps", "achieved_mean_mps", "constraint_met",
         "module06_detection_rate", "detection_rate", "median_displacement_m",
+        "median_final_offset_m",
         "median_delay_s", "rate_mps", "burst_s", "period_s", "onset_s",
     ]].rename(columns={"detection_rate": "adaptive"})  # fmt: skip
     print(table.round(3).to_string(index=False))
@@ -324,13 +354,15 @@ def report(frontier, oracle, out, elapsed, trusted=True):
     if not con["constraint_met"].all():
         missed = con.loc[~con["constraint_met"], "mean_rate_mps"].tolist()
         print(
-            "\nUnreachable mean rates (the rate bound caps them), excluded below: "
+            "\nMean rates the search could not hit within "
+            f"{RATE_TOLERANCE:.0%}, excluded below: "
             + ", ".join(f"{r:g}" for r in missed)
         )
     con = con[con["constraint_met"]]
     at_cap = [
         name for name, (_, hi, _) in BOUNDS.items()
-        if name in con and (con[name] >= hi - 1e-6).any()
+        # duty 1.0 is a plain continuous drift, not a binding limit
+        if name in con and name != "duty" and (con[name] >= hi - 1e-6).any()
     ]  # fmt: skip
     if at_cap:
         print(

@@ -47,6 +47,7 @@ START_FRACTION = 0.25
 FAILED = {
     "detected": True, "first_alarm_s": np.nan, "delay_s": np.nan,
     "displacement_m": 0.0, "final_offset_m": 0.0, "score": 0.0,
+    "attack_duration_s": np.nan, "achieved_mean_mps": 0.0,
     "n_alarms": 0, "alarms_before_onset": 0, "ok": False,
 }  # fmt: skip
 
@@ -140,6 +141,7 @@ class KalmanOracle:
         )
         detected = len(inside) > 0
         hit = float(offset[inside[0]]) if detected else np.nan
+        window = max(end - start, 1e-9)
         return {
             "detected": bool(detected),
             "first_alarm_s": float(t[inside[0]]) if detected else np.nan,
@@ -147,6 +149,11 @@ class KalmanOracle:
             "displacement_m": hit if detected else final,
             "final_offset_m": final,
             "score": float(hit if detected else final),
+            # measured, not assumed: the mean speed the spoofed position actually
+            # travelled at over the attack window. rate_mps x duty only equals this
+            # when the duty cycle fits inside the window, which it often does not.
+            "attack_duration_s": float(window),
+            "achieved_mean_mps": float(final / window),
             "n_alarms": int(len(idx)),
             "alarms_before_onset": int((alarm_t < start).sum()),
             "ok": True,

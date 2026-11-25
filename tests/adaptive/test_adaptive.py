@@ -163,9 +163,13 @@ def test_the_oracle_reports_what_an_attacker_can_see(wired):
     _, _, g = sr.normal_flights("test")[0]
     r = oracle(g, profile_fn(DEFAULT))
     assert set(r) == {"detected", "first_alarm_s", "delay_s", "displacement_m",
-                      "final_offset_m", "score", "n_alarms", "alarms_before_onset",
+                      "final_offset_m", "score", "attack_duration_s",
+                      "achieved_mean_mps", "n_alarms", "alarms_before_onset",
                       "ok"}  # fmt: skip
     assert r["ok"] and r["final_offset_m"] > 0.0
+    assert r["achieved_mean_mps"] == pytest.approx(
+        r["final_offset_m"] / r["attack_duration_s"]
+    )
     assert oracle.calls == 1
     assert r["detected"] == np.isfinite(r["delay_s"])
 
@@ -247,8 +251,10 @@ def test_the_search_runs_and_compares_itself_with_module06(wired):
     probes = pd.read_csv(out / "adaptive_search.csv")
     assert set(probes["search"]) == {"mean_rate=0.1", "mean_rate=1", "free"}
     assert len(probes) == 4 * 3
-    held = probes[probes["search"] == "mean_rate=0.1"]
-    assert held["rate_mps"].min() >= 0.1 - 1e-9  # the constraint held throughout
+    # rate_mps is free now; the measured mean speed is what is pinned
+    slow = con[con["mean_rate_mps"] == 0.1].iloc[0]
+    assert slow["achieved_mean_mps"] == pytest.approx(0.1, rel=sr.RATE_TOLERANCE)
+    assert "formula_mean_mps" in con.columns
 
 
 def test_the_selftest_flags_an_oracle_that_disagrees_with_module06(wired):
@@ -270,6 +276,24 @@ def test_the_selftest_separates_module04s_onset_from_the_eased_one(wired):
     assert frame["module04"].between(0, 1).all()
     assert frame["eased"].between(0, 1).all()
     assert (frame["disp_module04_m"] > 0).all()
+
+
+def test_the_constraint_cannot_be_gamed_by_a_cycle_longer_than_the_flight(wired):
+    """One long burst reads as a slow mean by formula, but not when it is measured."""
+    oracle = orc.KalmanOracle()
+    flights = sr.normal_flights("test")
+    sneaky = {**DEFAULT, "rate_mps": 10.0, "duty": 0.1, "period_s": 600.0,
+              "onset_s": 20.0}  # fmt: skip
+    from aerovigil.adaptive.profile import mean_rate
+
+    assert mean_rate(sneaky) == pytest.approx(1.0)  # what the formula claims
+    _, frame = sr.probe(oracle, flights, sneaky)
+    assert sr.achieved_mean(frame) > 2.0  # what it actually does
+    honest, _ = sr.constrained_objective(oracle, flights, sneaky, 1.0, "consistent")
+    plain = {**DEFAULT, "rate_mps": 1.0, "duty": 1.0, "onset_s": 20.0}
+    good, gframe = sr.constrained_objective(oracle, flights, plain, 1.0, "consistent")
+    assert sr.achieved_mean(gframe) == pytest.approx(1.0, rel=0.2)
+    assert honest < good  # the penalty rejects the gamed candidate
 
 
 def test_the_frontier_marks_a_mean_rate_the_rate_bound_cannot_reach(wired):
@@ -294,3 +318,10 @@ def test_mean_rate_and_burst_length_describe_the_duty_cycle():
     assert mean_rate(p) == pytest.approx(0.3)
     assert burst_seconds(p) == pytest.approx(20.0)
     assert mean_rate({**DEFAULT, "duty": 1.0}) == pytest.approx(DEFAULT["rate_mps"])
+
+
+@pytest.mark.parametrize("limit,expected", [(1, 1), (2, 2), (3, 3)])
+def test_search_flights_asks_for_exactly_that_many(wired, limit, expected):
+    """The earlier integer division turned --search-flights 5 into 3 flights."""
+    assert len(sr.normal_flights("validation", limit)) == expected
+    assert len(sr.normal_flights("validation")) >= 3  # no limit means all of them

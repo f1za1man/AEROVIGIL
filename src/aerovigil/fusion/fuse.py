@@ -267,7 +267,7 @@ def threat_groups(flights):
     sweep = att["set"] == "sweep"
     for rate in sorted(att.loc[sweep, "drift_rate_mps"].dropna().unique()):
         groups.append((
-            f"Drift sweep {rate:g} m/s (Module 04 onset)",
+            f"Consistent drift {rate:g} m/s",
             sweep & (att["drift_rate_mps"] == rate),
         ))  # fmt: skip
     return att, [(name, m) for name, m in groups if m.any()]

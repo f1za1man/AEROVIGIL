@@ -1,0 +1,88 @@
+module,metric,group,old,new,change
+"M5 RF (event, all, orig+syn)",AUC,auc_orig,1.0,1.0,0.0
+"M5 RF (event, all, orig+syn)",AUC,auc_syn_position_only,0.9941642325802764,0.994131013038972,-3.3219541304418954e-05
+"M5 RF (event, all, orig+syn)",AUC,auc_syn_consistent,0.9095903003771324,0.9023805999192976,-0.007209700457834756
+M6 nis_test,drift sweep detected,0.05 m/s,0.0476190476190476,0.0476190476190476,0.0
+M6 nis_test,drift sweep detected,0.1 m/s,0.0476190476190476,0.0476190476190476,0.0
+M6 nis_test,drift sweep detected,0.25 m/s,0.5714285714285714,0.0476190476190476,-0.5238095238095238
+M6 nis_test,drift sweep detected,0.5 m/s,1.0,0.0476190476190476,-0.9523809523809524
+M6 nis_test,drift sweep detected,1 m/s,1.0,1.0,0.0
+M6 nis_test,drift sweep detected,2 m/s,1.0,1.0,0.0
+M6 nis_test,drift sweep detected,5 m/s,1.0,1.0,0.0
+M6 cusum,drift sweep detected,0.05 m/s,0.0952380952380952,0.0952380952380952,0.0
+M6 cusum,drift sweep detected,0.1 m/s,0.0952380952380952,0.0952380952380952,0.0
+M6 cusum,drift sweep detected,0.25 m/s,0.1428571428571428,0.1428571428571428,0.0
+M6 cusum,drift sweep detected,0.5 m/s,0.0952380952380952,0.0952380952380952,0.0
+M6 cusum,drift sweep detected,1 m/s,0.1428571428571428,0.1428571428571428,0.0
+M6 cusum,drift sweep detected,2 m/s,0.0476190476190476,0.0476190476190476,0.0
+M6 cusum,drift sweep detected,5 m/s,0.1428571428571428,0.1428571428571428,0.0
+M6 nis_test,consistent detected,abrupt_jump,0.9523809523809524,0.9523809523809524,0.0
+M6 nis_test,consistent detected,constant_offset,1.0,1.0,0.0
+M6 nis_test,consistent detected,exponential_ramp,0.5238095238095238,0.1428571428571428,-0.38095238095238104
+M6 nis_test,consistent detected,linear_drift,0.6190476190476191,0.3809523809523809,-0.2380952380952382
+M6 nis_test,consistent detected,low_amplitude_wander,0.8571428571428571,0.3809523809523809,-0.4761904761904762
+M7 lstm_ae,synthetic detected (mean over seeds),position_only,1.0,1.0,0.0
+M7 lstm_ae,synthetic detected (mean over seeds),consistent,0.7523809523809524,0.7238095238095238,-0.02857142857142858
+M7 lstm_supervised,synthetic detected (mean over seeds),position_only,1.0,1.0,0.0
+M7 lstm_supervised,synthetic detected (mean over seeds),consistent,0.8031746031746032,0.8031746031746032,0.0
+M9 consistency,false alarms per hour,normal test flights,0.9634922096302116,1.316657620741161,0.35316541111094946
+M10 kalman,detected,Dataset's own attacks (simulator),1.0,1.0,0.0
+M10 velocity,detected,Dataset's own attacks (simulator),0.9696969696969696,0.9696969696969696,0.0
+M10 fused,detected,Dataset's own attacks (simulator),1.0,1.0,0.0
+M10 kalman,detected,"Synthetic position-only, all families",0.9904761904761904,0.9904761904761904,0.0
+M10 velocity,detected,"Synthetic position-only, all families",0.9904761904761904,0.9904761904761904,0.0
+M10 fused,detected,"Synthetic position-only, all families",1.0,1.0,0.0
+M10 kalman,detected,position-only abrupt_jump,0.9523809523809524,0.9523809523809524,0.0
+M10 velocity,detected,position-only abrupt_jump,1.0,1.0,0.0
+M10 fused,detected,position-only abrupt_jump,1.0,1.0,0.0
+M10 kalman,detected,position-only constant_offset,1.0,1.0,0.0
+M10 velocity,detected,position-only constant_offset,1.0,1.0,0.0
+M10 fused,detected,position-only constant_offset,1.0,1.0,0.0
+M10 kalman,detected,position-only exponential_ramp,1.0,1.0,0.0
+M10 velocity,detected,position-only exponential_ramp,1.0,1.0,0.0
+M10 fused,detected,position-only exponential_ramp,1.0,1.0,0.0
+M10 kalman,detected,position-only linear_drift,1.0,1.0,0.0
+M10 velocity,detected,position-only linear_drift,0.9523809523809524,0.9523809523809524,0.0
+M10 fused,detected,position-only linear_drift,1.0,1.0,0.0
+M10 kalman,detected,position-only low_amplitude_wander,1.0,1.0,0.0
+M10 velocity,detected,position-only low_amplitude_wander,1.0,1.0,0.0
+M10 fused,detected,position-only low_amplitude_wander,1.0,1.0,0.0
+M10 kalman,detected,"Synthetic velocity-consistent, all families",0.8095238095238095,0.6,-0.20952380952380956
+M10 velocity,detected,"Synthetic velocity-consistent, all families",0.3238095238095238,0.238095238095238,-0.08571428571428583
+M10 fused,detected,"Synthetic velocity-consistent, all families",0.8,0.580952380952381,-0.21904761904761905
+M10 kalman,detected,velocity-consistent abrupt_jump,0.9523809523809524,0.9523809523809524,0.0
+M10 velocity,detected,velocity-consistent abrupt_jump,0.9047619047619048,0.9047619047619048,0.0
+M10 fused,detected,velocity-consistent abrupt_jump,1.0,1.0,0.0
+M10 kalman,detected,velocity-consistent constant_offset,1.0,1.0,0.0
+M10 velocity,detected,velocity-consistent constant_offset,0.6666666666666666,0.2857142857142857,-0.38095238095238093
+M10 fused,detected,velocity-consistent constant_offset,1.0,1.0,0.0
+M10 kalman,detected,velocity-consistent exponential_ramp,0.5238095238095238,0.1904761904761904,-0.3333333333333334
+M10 velocity,detected,velocity-consistent exponential_ramp,0.0476190476190476,0.0,-0.0476190476190476
+M10 fused,detected,velocity-consistent exponential_ramp,0.5238095238095238,0.1428571428571428,-0.38095238095238104
+M10 kalman,detected,velocity-consistent linear_drift,0.6666666666666666,0.4285714285714285,-0.23809523809523814
+M10 velocity,detected,velocity-consistent linear_drift,0.0,0.0,0.0
+M10 fused,detected,velocity-consistent linear_drift,0.6190476190476191,0.3809523809523809,-0.2380952380952382
+M10 kalman,detected,velocity-consistent low_amplitude_wander,0.9047619047619048,0.4285714285714285,-0.4761904761904763
+M10 velocity,detected,velocity-consistent low_amplitude_wander,0.0,0.0,0.0
+M10 fused,detected,velocity-consistent low_amplitude_wander,0.8571428571428571,0.3809523809523809,-0.4761904761904762
+M10 kalman,detected,Consistent drift 0.05 m/s,0.0952380952380952,0.0952380952380952,0.0
+M10 velocity,detected,Consistent drift 0.05 m/s,0.0,0.0,0.0
+M10 fused,detected,Consistent drift 0.05 m/s,0.0476190476190476,0.0476190476190476,0.0
+M10 kalman,detected,Consistent drift 0.1 m/s,0.0952380952380952,0.0952380952380952,0.0
+M10 velocity,detected,Consistent drift 0.1 m/s,0.0,0.0,0.0
+M10 fused,detected,Consistent drift 0.1 m/s,0.0476190476190476,0.0476190476190476,0.0
+M10 kalman,detected,Consistent drift 0.25 m/s,0.7142857142857143,0.0952380952380952,-0.6190476190476191
+M10 velocity,detected,Consistent drift 0.25 m/s,0.0,0.0,0.0
+M10 fused,detected,Consistent drift 0.25 m/s,0.5714285714285714,0.0476190476190476,-0.5238095238095238
+M10 kalman,detected,Consistent drift 0.5 m/s,1.0,0.0952380952380952,-0.9047619047619048
+M10 velocity,detected,Consistent drift 0.5 m/s,0.0,0.0,0.0
+M10 fused,detected,Consistent drift 0.5 m/s,1.0,0.0476190476190476,-0.9523809523809524
+M10 kalman,detected,Consistent drift 1 m/s,1.0,1.0,0.0
+M10 velocity,detected,Consistent drift 1 m/s,0.0,0.0,0.0
+M10 fused,detected,Consistent drift 1 m/s,1.0,1.0,0.0
+M10 kalman,detected,Consistent drift 2 m/s,1.0,1.0,0.0
+M10 velocity,detected,Consistent drift 2 m/s,0.0,0.0,0.0
+M10 fused,detected,Consistent drift 2 m/s,1.0,1.0,0.0
+M10 kalman,detected,Consistent drift 5 m/s,1.0,1.0,0.0
+M10 velocity,detected,Consistent drift 5 m/s,0.0476190476190476,0.0,-0.0476190476190476
+M10 fused,detected,Consistent drift 5 m/s,1.0,1.0,0.0

@@ -40,6 +40,7 @@ import numpy as np
 import pandas as pd
 
 from aerovigil.adaptive.oracle import ROOT, KalmanOracle
+from aerovigil.consistency.oracle import ConsistencyOracle
 from aerovigil.adaptive.profile import (
     BOUNDS,
     DEFAULT,
@@ -241,13 +242,16 @@ def selftest(oracle, exam, rates=MEAN_RATES, mode="consistent"):
     return frame, trusted
 
 
+DETECTORS = {"kalman": KalmanOracle, "consistency": ConsistencyOracle}
+
+
 def run(evals=EVALS, free_evals=FREE_EVALS, search_flights=SEARCH_FLIGHTS,
         rates=MEAN_RATES, output_dir=None, mode="consistent", threshold=None,
-        skip_selftest=False):  # fmt: skip
+        skip_selftest=False, detector="kalman"):  # fmt: skip
     out = Path(output_dir) if output_dir else OUT_DIR
     out = out if out.is_absolute() else ROOT / out
     out.mkdir(parents=True, exist_ok=True)
-    oracle = KalmanOracle(threshold=threshold)
+    oracle = DETECTORS[detector](threshold=threshold)
     practice = normal_flights("validation", search_flights)
     exam = normal_flights("test")
     rng = np.random.default_rng(SEED)
@@ -255,7 +259,7 @@ def run(evals=EVALS, free_evals=FREE_EVALS, search_flights=SEARCH_FLIGHTS,
     print("AEROVIGIL - MODULE 08 ADAPTIVE ATTACKER (black-box, alarms only)")
     print("=" * 74)
     print(
-        f"Detector: Module 06 chi-square, threshold {oracle.threshold:.2f}, "
+        f"Detector: {detector}, threshold {oracle.threshold:.2f}, "
         f"refractory {oracle.refractory_s:g} s"
     )
     print(
@@ -269,6 +273,8 @@ def run(evals=EVALS, free_evals=FREE_EVALS, search_flights=SEARCH_FLIGHTS,
     started, probes, best, rows = time.time(), [], {}, []
     warm = None
     trusted = True
+    if detector != "kalman":
+        skip_selftest = True  # the Module 06 frontier is not this detector's baseline
     if not skip_selftest:
         check, trusted = selftest(oracle, exam, rates, mode)
         check.to_csv(out / "adaptive_selftest.csv", index=False)
@@ -410,9 +416,10 @@ def main():
     ap.add_argument("--threshold", type=float, default=None)
     ap.add_argument("--output-dir", default=None)
     ap.add_argument("--skip-selftest", action="store_true")
+    ap.add_argument("--detector", default="kalman", choices=sorted(DETECTORS))
     a = ap.parse_args()
     run(a.evals, a.free_evals, a.search_flights, MEAN_RATES, a.output_dir,
-        a.mode, a.threshold, a.skip_selftest)  # fmt: skip
+        a.mode, a.threshold, a.skip_selftest, a.detector)  # fmt: skip
 
 
 if __name__ == "__main__":

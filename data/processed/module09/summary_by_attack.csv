@@ -1,0 +1,2 @@
+set,attack_type,velocity_mode,n,detection_rate,median_delay_s,median_displacement_m,peak_course,peak_velocity
+orig,original,na,33,0.9696969696969697,0.2140000000000002,0.7668563357328673,2.006354402135587,573.6700363966261

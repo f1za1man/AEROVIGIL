@@ -12,8 +12,8 @@
     0.003836019044369459
   ],
   "threshold": 15.348413114339879,
-  "calibration_hours": 2.6302088888888897,
-  "allowed_alarms": 3,
+  "calibration_hours": 1.8705211111111109,
+  "allowed_alarms": 2,
   "alarms_used": 0,
   "budget_per_hour": 1.0,
   "refractory_s": 10.0

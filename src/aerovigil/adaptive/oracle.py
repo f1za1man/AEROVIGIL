@@ -106,7 +106,9 @@ class KalmanOracle:
         """
         duration = float(g["t_s"].iloc[-1])
         spec = self.spec(duration, attack_type, params)
-        out, _ = inject(g, spec, mode, "adaptive_probe", profile_fn)
+        # onset="scale": the self-test reproduces Module 06's frontier, which was
+        # measured on attacks made with the original ease-in.
+        out, _ = inject(g, spec, mode, "adaptive_probe", profile_fn, onset="scale")
         return out
 
     def __call__(self, g, profile_fn=None, mode="consistent", attack_type="adaptive",

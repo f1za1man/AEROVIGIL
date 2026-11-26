@@ -166,13 +166,23 @@ def save(path, sig):
 
 
 class StaleCache(ValueError):
-    """A cache file written by an older version of this module."""
+    """A cache file written by an older version of this module, or from a source
+    flight that has since been regenerated."""
 
 
-def load(path):
+def source_stamp(path):
+    """Size and modification time of a source flight. Regenerated Module 04 flights
+    keep their names, so the name alone cannot tell a cache file is out of date."""
+    st = Path(path).stat()
+    return f"{st.st_size}:{st.st_mtime_ns}"
+
+
+def load(path, stamp=None):
     with np.load(path) as z:
         out = {k: z[k] for k in z.files}
     if int(out.get("version", 0)) != CACHE_VERSION:
+        raise StaleCache(path)
+    if stamp is not None and str(out.get("source", "")) != stamp:
         raise StaleCache(path)
     for k in ("start_s", "end_s", "onset_s"):
         out[k] = float(out[k])
@@ -235,7 +245,7 @@ def run(limit=None, output_dir=None, force=False):
         sig = None
         if not force and target.is_file():
             try:
-                sig = load(target)
+                sig = load(target, source_stamp(path) if path.is_file() else None)
             except StaleCache:
                 stale += 1  # written before the last change to what is cached
             except (OSError, ValueError, KeyError, EOFError, zipfile.BadZipFile):
@@ -246,6 +256,7 @@ def run(limit=None, output_dir=None, force=False):
                     f"Missing {path}. Build the Module 03/04 v2 base first."
                 )
             sig = flight_signals(pd.read_parquet(path), ctx)
+            sig["source"] = source_stamp(path)
             save(target, sig)
         r["kf_hours"] = monitored_seconds(sig["kf_t"], sig["kf_valid"]) / 3600.0
         r["vel_hours"] = monitored_seconds(sig["row_t"], sig["vel_valid"]) / 3600.0
@@ -261,7 +272,10 @@ def run(limit=None, output_dir=None, force=False):
         f"the filter, {normal['vel_hours'].sum():.2f} h by the velocity channel"
     )
     if stale:
-        print(f"Recomputed {stale} cache file(s) written by an older version")
+        print(
+            f"Recomputed {stale} cache file(s) from an older version or a "
+            "regenerated source flight"
+        )
     if rebuilt:
         print(
             f"Rebuilt {rebuilt} cache file(s) that an interrupted run had left broken"

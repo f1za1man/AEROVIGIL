@@ -135,6 +135,19 @@ def test_row_times_survive_the_cache_exactly_so_an_onset_alarm_is_inside(tmp_pat
     assert out["velocity_delay_s"] == pytest.approx(0.0, abs=1e-9)
 
 
+def test_a_cache_file_from_a_regenerated_source_is_rejected(tmp_path):
+    from aerovigil.fusion.signals import source_stamp
+
+    src = tmp_path / "flight.parquet"
+    src.write_bytes(b"first version")
+    sig = {**signal(), "source": source_stamp(src)}
+    save(tmp_path / "f.npz", sig)
+    assert load(tmp_path / "f.npz", source_stamp(src))["kf_t"].size
+    src.write_bytes(b"regenerated, same name")
+    with pytest.raises(StaleCache):
+        load(tmp_path / "f.npz", source_stamp(src))
+
+
 def test_a_cache_file_from_an_older_version_is_rejected(tmp_path):
     old = {k: v for k, v in signal().items() if k != "version"}
     save(tmp_path / "old.npz", old)

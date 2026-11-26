@@ -24,7 +24,15 @@ import numpy as np
 import pandas as pd
 import yaml
 
-from aerovigil.attacks.inject_v2 import KEEP, MODES, SCALARS, SHORT, inject
+from aerovigil.attacks.inject_v2 import (
+    DEFAULT_ONSET,
+    KEEP,
+    MODES,
+    ONSETS,
+    SCALARS,
+    SHORT,
+    inject,
+)
 from aerovigil.attacks.profiles import ATTACK_TYPES
 from aerovigil.attacks.sampler import sample_attack
 
@@ -55,7 +63,7 @@ def attack_id(src, attack_set, typ, draw, rate, mode):
     return f"{src}__syn_{typ}_{draw:02d}_{SHORT[mode]}"
 
 
-def run(output_dir=None, limit=None, min_free_gb=8.0):
+def run(output_dir=None, limit=None, min_free_gb=8.0, onset=DEFAULT_ONSET):
     cfg = yaml.safe_load(CONFIG.read_text())
     out_root = Path(output_dir) if output_dir else OUT_DIR
     out_root = out_root if out_root.is_absolute() else ROOT / out_root
@@ -75,7 +83,10 @@ def run(output_dir=None, limit=None, min_free_gb=8.0):
     if limit:
         src = src.groupby("split", group_keys=False).head(limit)
     free = shutil.disk_usage(out_root).free / 1e9
-    print(f"Normal source flights: {len(src)}   free disk: {free:.1f} GB")
+    print(
+        f"Normal source flights: {len(src)}   free disk: {free:.1f} GB   "
+        f"consistent-mode onset: {onset}"
+    )
     if free < min_free_gb:
         raise SystemExit(
             f"Only {free:.1f} GB free; need {min_free_gb} GB (see --min-free-gb)"
@@ -93,7 +104,7 @@ def run(output_dir=None, limit=None, min_free_gb=8.0):
             modes = MODES if attack_set == "main" else ("consistent",)
             for mode in modes:
                 new_id = attack_id(r["flight_id"], attack_set, typ, draw, rate, mode)
-                out, facts = inject(g, spec, mode, new_id)
+                out, facts = inject(g, spec, mode, new_id, onset=onset)
                 fname = new_id.replace(".", "p") + ".parquet"
                 out.to_parquet(flights_dir / fname, index=False, compression="zstd")
                 p = spec["params"]
@@ -103,6 +114,7 @@ def run(output_dir=None, limit=None, min_free_gb=8.0):
                     "pair_id": f"{r['flight_id']}|{typ}|{draw}", "split": r["split"],
                     "mission_type": r["mission"], "attack_set": attack_set,
                     "attack_type": typ, "draw": draw, "velocity_mode": mode,
+                    "onset": onset if mode == "consistent" else "na",
                     **{c: p.get(c, np.nan) for c in SCALARS},
                     "start_s": spec["start_s"], "duration_s": spec["duration_s"],
                     "end_s": end_s, "flight_duration_s": duration,
@@ -166,8 +178,13 @@ def main():
     ap.add_argument("--limit", type=int, default=None, help="source flights per split")
     ap.add_argument("--output-dir", default=None)
     ap.add_argument("--min-free-gb", type=float, default=8.0)
+    ap.add_argument(
+        "--onset", choices=ONSETS, default=DEFAULT_ONSET,
+        help="consistent-mode ease-in: warp (no velocity overshoot) or scale (the "
+        "original, 69%% overshoot on a linear drift)",
+    )  # fmt: skip
     a = ap.parse_args()
-    run(a.output_dir, a.limit, a.min_free_gb)
+    run(a.output_dir, a.limit, a.min_free_gb, a.onset)
 
 
 if __name__ == "__main__":

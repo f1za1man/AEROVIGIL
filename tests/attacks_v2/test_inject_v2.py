@@ -116,9 +116,10 @@ def test_consistent_speed_follows_the_components_and_keeps_source_noise(three_d)
     assert (out.velocity[on] - g.velocity[on]).abs().max() > 0.5
 
 
-def test_consistent_mode_eases_the_offset_in_and_never_steps_the_velocity():
+def test_scale_onset_eases_the_offset_in_and_never_steps_the_velocity():
+    """The original ease-in, kept for Module 08's self-test."""
     g = fake_flight("N")
-    out, _ = inject(g, spec("linear_drift", DRIFT), "consistent", "A")
+    out, _ = inject(g, spec("linear_drift", DRIFT), "consistent", "A", onset="scale")
     on = out.attack_label == 1
     delta = out.velocity_north - g.velocity_north
     assert abs(delta[on].iloc[0]) < 1e-6  # a step would start at the full rate
@@ -128,6 +129,71 @@ def test_consistent_mode_eases_the_offset_in_and_never_steps_the_velocity():
     assert out["offset_m"].iloc[half] == pytest.approx(0.375, abs=0.02)
     late = (t > 40) & (t <= 70)
     assert np.allclose(out.loc[late, "offset_m"], (t - 30.0)[late], atol=0.01)
+
+
+def test_scale_onset_overshoots_the_drift_rate_by_69_percent():
+    """What Module 08 measured, and why warp became the default."""
+    g = fake_flight("N", hz=250)
+    out, _ = inject(g, spec("linear_drift", DRIFT), "consistent", "A", onset="scale")
+    assert out["offset_rate_mps"].max() == pytest.approx(1.6875, abs=0.01)
+
+
+def test_warp_onset_never_reports_more_than_the_drift_rate():
+    g = fake_flight("N", hz=250)
+    out, _ = inject(g, spec("linear_drift", DRIFT), "consistent", "A")
+    rate = out["offset_rate_mps"]
+    assert rate.max() <= 1.0 + 1e-5  # never above the drift rate
+    on = out.attack_label == 1
+    delta = out.velocity_north - g.velocity_north
+    assert abs(delta[on].iloc[0]) < 1e-6  # starts from zero speed
+    assert delta[on].diff().abs().max() < 0.01  # and rises smoothly
+    t = g["t_s"]
+    late = (t > 40) & (t <= 70)  # past the ease-in: the drift lags by half of it
+    assert np.allclose(out.loc[late, "offset_m"], (t - 30.0 - 0.75)[late], atol=0.01)
+    assert np.allclose(delta[late], 1.0, atol=1e-5)
+
+
+@pytest.mark.parametrize("typ", ["linear_drift", "constant_offset",
+                                 "exponential_ramp", "low_amplitude_wander"])  # fmt: skip
+def test_warp_onset_reports_the_velocity_of_the_position_it_reports(typ):
+    """Consistent means the reported velocity is the derivative of the reported
+    offset; checked numerically for every family the warp applies to."""
+    params = {
+        "linear_drift": DRIFT,
+        "constant_offset": {"direction_deg": 30.0, "magnitude_m": 20.0,
+                            "ramp_seconds": 4.0},
+        "exponential_ramp": {"direction_deg": 60.0, "initial_rate_mps": 0.5,
+                             "time_constant_s": 20.0, "max_offset_m": 500.0},
+        "low_amplitude_wander": {"amplitude_m": 5.0, "periods_s": [10, 20, 40],
+                                 "phases_north": [1, 2, 3], "phases_east": [4, 5, 6]},
+    }[typ]  # fmt: skip
+    g = fake_flight("N", hz=250)
+    out, _ = inject(g, spec(typ, params), "consistent", "A")
+    t = g["t_s"].to_numpy()
+    on = ((t > 30.01) & (t < 69.99))[1:-1]
+    for col, comp in (("velocity_north", "spoof_offset_north_m"),
+                      ("velocity_east", "spoof_offset_east_m")):  # fmt: skip
+        x = out[comp].to_numpy(float)
+        back = (x[1:-1] - x[:-2]) / (t[1:-1] - t[:-2])
+        ahead = (x[2:] - x[1:-1]) / (t[2:] - t[1:-1])
+        dv = (out[col] - g[col]).to_numpy(float)[1:-1]
+        # either side, so the corner where constant_offset's ramp ends (a rate step
+        # that belongs to the profile itself) is judged on the side it belongs to
+        err = np.minimum(np.abs(back - dv), np.abs(ahead - dv))
+        assert err[on].max() < 0.02, (typ, col)
+
+
+def test_abrupt_jump_keeps_the_scale_onset_under_warp():
+    g = fake_flight("N")
+    warp, _ = inject(g, spec("abrupt_jump", JUMP), "consistent", "A")
+    scale, _ = inject(g, spec("abrupt_jump", JUMP), "consistent", "A", onset="scale")
+    pd.testing.assert_frame_equal(warp, scale)
+
+
+def test_an_unknown_onset_is_refused():
+    with pytest.raises(ValueError):
+        inject(fake_flight("N"), spec("linear_drift", DRIFT), "consistent", "A",
+               onset="ramp")  # fmt: skip
 
 
 def test_abrupt_jump_consistent_now_differs_from_position_only():

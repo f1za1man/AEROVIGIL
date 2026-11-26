@@ -17,6 +17,16 @@ What changes against Module 04 v1:
     a giveaway no careful spoofer would leave, and the Kalman filter in Module 06
     detects it in a single sample, which made the stealth frontier measure the
     switch-on rather than the drift.
+  * how that ease-in is done is the `onset` option. "scale" (the original) multiplies
+    the offset by a smoothstep; the product rule then adds offset x d(weight)/dt to
+    the velocity, and a linear drift's reported rate overshoots the drift rate by 69%
+    during switch-on (Module 08 measured it). "warp" (the default since Module 10)
+    eases the attack's own clock in instead: the offset follows the same profile
+    along a time axis that starts at zero speed, so the reported rate rises smoothly
+    from zero and never exceeds the profile's own rate. An abrupt jump starts at its
+    full size and cannot be eased that way, so it keeps "scale" in both settings.
+    Module 08's self-test reproduces Module 06's frontier on the old data and passes
+    onset="scale".
 
 This file holds the injector itself; generate_v2.py runs it over all flights.
 """
@@ -34,6 +44,8 @@ from aerovigil.features.imu_consistency import IMU_INPUTS
 
 EDGE_TOL_S = 1e-6
 ONSET_RAMP_S = 1.5
+ONSETS = ("warp", "scale")
+DEFAULT_ONSET = "warp"
 MODES = ("position_only", "consistent")
 SHORT = {"position_only": "po", "consistent": "cv"}
 KEEP = [
@@ -59,6 +71,18 @@ def smooth_start(tau, seconds):
     return x * x * (3.0 - 2.0 * x), 6.0 * x * (1.0 - x) / seconds
 
 
+def eased_clock(tau, seconds):
+    """Warped attack time phi and its rate w = dphi/dtau.
+
+    w is the smoothstep, so phi starts at zero speed and runs at full speed after
+    `seconds`: phi = tau - seconds / 2 from then on. Profile values taken at phi have
+    rate profile_rate(phi) * w, which never exceeds the profile's own rate."""
+    tau = np.asarray(tau, float)
+    x = np.clip(tau / seconds, 0.0, 1.0)
+    phi = np.where(tau < seconds, seconds * (x**3 - 0.5 * x**4), tau - 0.5 * seconds)
+    return phi, x * x * (3.0 - 2.0 * x)
+
+
 def speed_uses_3d(g):
     """True when the scalar speed column is the 3D norm of the velocity components."""
     vn, ve, vu = (
@@ -70,24 +94,33 @@ def speed_uses_3d(g):
     return bool(err3 < err2)
 
 
-def inject(g, spec, mode, new_id, profile_fn=None):
+def inject(g, spec, mode, new_id, profile_fn=None, onset=DEFAULT_ONSET):
     """Return the attacked flight (base schema + truth columns) for one spec and mode.
 
     profile_fn: an optional callable tau -> (north_m, east_m, d_north, d_east) used
     instead of the named profile. Module 08's adaptive attacker passes one, and it
     already eases its own onset, so the fixed ONSET_RAMP_S ease-in is skipped for it.
+    onset: "warp" or "scale", how consistent mode eases a named profile in (see top).
     """
+    if onset not in ONSETS:
+        raise ValueError(f"onset must be one of {ONSETS}, not {onset!r}")
     t = g["t_s"].to_numpy(float)
     tau = t - spec["start_s"]
     active = (tau >= 0) & (tau <= spec["duration_s"] + EDGE_TOL_S)
     n, e, dn, de = (np.zeros(len(t)) for _ in range(4))
-    if active.any():
+    eased = mode == "consistent" and profile_fn is None
+    warp = eased and onset == "warp" and spec["attack_type"] != "abrupt_jump"
+    if active.any() and warp:
+        phi, w = eased_clock(tau[active], ONSET_RAMP_S)
+        pn, pe, pdn, pde = offset_profile(spec["attack_type"], phi, spec["params"])
+        n[active], e[active], dn[active], de[active] = pn, pe, pdn * w, pde * w
+    elif active.any():
         n[active], e[active], dn[active], de[active] = (
             profile_fn(tau[active])
             if profile_fn is not None
             else offset_profile(spec["attack_type"], tau[active], spec["params"])
         )
-        if mode == "consistent" and profile_fn is None:
+        if eased:
             w, dw = smooth_start(tau[active], ONSET_RAMP_S)
             dn[active] = dn[active] * w + n[active] * dw
             de[active] = de[active] * w + e[active] * dw

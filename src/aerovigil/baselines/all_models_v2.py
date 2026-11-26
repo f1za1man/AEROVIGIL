@@ -18,11 +18,21 @@ fold from the flight it was made from) plus the validation normal windows. A win
 alarms above the threshold, alarms closer than 10 s are merged (the refractory every
 other detector uses), and the alarm latches per flight.
 
-Two protocols:
+Protocols (Step B ran the first two; --full adds the rest for plan M9):
     seen       train / validation / test flights as split by seed 42; every mission
                appears in training
-    unseen     leave one mission out: tune, train and calibrate on the other two
+    mission    leave one mission out: tune, train and calibrate on the other two
                missions, then test on every flight of the held-out mission
+    type       leave one attack family out of training and validation; test on that
+               family (and the normal test flights, for false alarms)
+    cvfa       six folds over all 144 normal flights, stratified by mission: train
+               and calibrate without fold k (and without any synthetic copy of a fold-k
+               flight), count false alarms on fold k
+
+Seeds: the decision tree, random forest and Isolation Forest have randomness. Each is
+tuned once at seed 42, then refitted and recalibrated with five seeds (42-46) and every
+metric is reported as mean and standard deviation over them. The other three models
+are deterministic and run once.
 
 Reported per model and protocol
     window level (event labels, at the latch threshold): accuracy, precision, recall,
@@ -33,10 +43,12 @@ Reported per model and protocol
         hours come from timestamps (Module 10's monitored time, signals_index.csv)
 
 Writes data/processed/module05_v2/all_models_window.csv, all_models_flight.csv,
-all_models_tuning.csv and reports/tables/B_classical_models.csv
+all_models_tuning.csv and reports/tables/B_classical_models.csv; with --full the same
+files with a _full suffix and reports/tables/C_classical_models.csv
 
 Usage:
     python src\aerovigil\baselines\all_models_v2.py
+    python src\aerovigil\baselines\all_models_v2.py --full
     python src\aerovigil\baselines\all_models_v2.py --models naive_bayes,knn --quick
 """
 
@@ -48,12 +60,11 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import yaml
-from scipy.stats import chi2
-from sklearn.metrics import confusion_matrix, roc_auc_score
 from sklearn.model_selection import GroupKFold
 
 from aerovigil.baselines.build_window_tables_v2 import OUT_DIR
 from aerovigil.baselines.models import (
+    STOCHASTIC,
     SUPERVISED,
     UNSUPERVISED,
     build_model,
@@ -61,16 +72,28 @@ from aerovigil.baselines.models import (
     grid,
     score_model,
 )
+from aerovigil.evaluation.metrics import (
+    poisson_upper,
+    refractory_count,
+    roc_auc,
+    window_metrics,
+)
+from aerovigil.fusion.fuse import folds_of
 from aerovigil.windowing.make_windows_v2 import STEP_S
 
 ROOT = Path(__file__).resolve().parents[3]
 CONFIG = ROOT / "configs" / "baselines" / "baselines.yaml"
 SIGNALS_INDEX = ROOT / "data" / "processed" / "module10" / "signals_index.csv"
 TABLE = ROOT / "reports" / "tables" / "B_classical_models.csv"
+TABLE_FULL = ROOT / "reports" / "tables" / "C_classical_models.csv"
 MODELS = SUPERVISED + UNSUPERVISED
 MISSIONS = ("curved", "random", "straight")
+FAMILIES = ("abrupt_jump", "constant_offset", "linear_drift", "exponential_ramp",
+            "low_amplitude_wander", "original")  # fmt: skip
 SEED = 42
+SEEDS = (42, 43, 44, 45, 46)
 FOLDS = 4
+CV_FOLDS = 6
 BUDGET_PER_HOUR = 1.0
 REFRACTORY_S = 10.0
 Y = "y_event"
@@ -95,19 +118,41 @@ def load(out_dir):
     return orig, syn
 
 
-def protocol_sets(orig, syn, held_out=None):
-    """(train, validation, clean-train, test-orig, test-syn) for one protocol."""
-    if held_out is None:
-        o_in, s_in = orig, syn
-        o_test = orig[orig["split"] == "test"]
-        s_test = syn[syn["split"] == "test"]
-        o_in = o_in[o_in["split"] != "test"]
-        s_in = s_in[s_in["split"] != "test"]
-    else:
+def source_of(frame):
+    return frame["source_flight_id"].fillna(frame["flight_id"])
+
+
+def protocol_sets(orig, syn, held_out=None, protocol=None, fold_of=None):
+    """(train, validation, clean-validation, test-orig, test-syn) for one protocol.
+
+    protocol None or "seen" / "mission" takes held_out as a mission (None = seen);
+    "type" takes it as an attack family, "cvfa" as a fold number.
+    """
+    protocol = protocol or ("seen" if held_out is None else "mission")
+    if protocol == "mission":
         o_in = orig[orig["mission_type"] != held_out]
         s_in = syn[syn["mission_type"] != held_out]
         o_test = orig[orig["mission_type"] == held_out]
         s_test = syn[syn["mission_type"] == held_out]
+    elif protocol == "cvfa":
+        out_o = source_of(orig).map(fold_of) == int(held_out)
+        out_s = source_of(syn).map(fold_of) == int(held_out)
+        o_in, s_in = orig[~out_o], syn[~out_s]
+        o_test = orig[out_o & (orig["attack_type"] == "none")]
+        s_test = syn.iloc[:0]
+    else:
+        o_in = orig[orig["split"] != "test"]
+        s_in = syn[syn["split"] != "test"]
+        o_test = orig[orig["split"] == "test"]
+        s_test = syn[syn["split"] == "test"]
+        if protocol == "type":
+            if held_out == "original":
+                o_in = o_in[~((o_in["attack_type"] == "original") & (o_in[Y] == 1))]
+                s_test = s_test.iloc[:0]
+            else:
+                s_in = s_in[s_in["attack_type"] != held_out]
+                s_test = s_test[s_test["attack_type"] == held_out]
+                o_test = o_test[o_test["attack_type"] == "none"]
     tr = pd.concat(
         [o_in[o_in["split"] == "train"], s_in[s_in["split"] == "train"]],
         ignore_index=True,
@@ -150,8 +195,7 @@ def score(name, pipe, frame, cols):
 
 
 def auc(y, s):
-    y = np.asarray(y)
-    return float(roc_auc_score(y, s)) if len(np.unique(y)) == 2 else np.nan
+    return roc_auc(y, s)
 
 
 def tune(name, params_grid, tr, va, cols):
@@ -166,10 +210,10 @@ def tune(name, params_grid, tr, va, cols):
     return json.loads(best), tab
 
 
-def clean_pool(name, params, tr, clean_va, final, cols):
+def clean_pool(name, params, tr, clean_va, final, cols, seed=SEED):
     """Honest scores on clean windows: out-of-fold on the training flights' normal
     windows, grouped by source flight, plus the validation normal windows."""
-    groups = tr["source_flight_id"].fillna(tr["flight_id"]).to_numpy()
+    groups = source_of(tr).to_numpy()
     normal = (tr["attack_type"] == "none").to_numpy()
     parts = []
     n = min(FOLDS, len(np.unique(groups)))
@@ -177,7 +221,7 @@ def clean_pool(name, params, tr, clean_va, final, cols):
         for a, b in GroupKFold(n_splits=n).split(tr, groups=groups):
             held = tr.iloc[b][normal[b]]
             if len(held):
-                pipe = fit(name, params, tr.iloc[a], cols)
+                pipe = fit(name, params, tr.iloc[a], cols, seed)
                 parts.append(score(name, pipe, held, cols))
     parts.append(score(name, final, clean_va, cols))
     return np.concatenate(parts)
@@ -189,15 +233,6 @@ def threshold_for(pool, budget=BUDGET_PER_HOUR):
     hours = len(pool) * STEP_S / 3600.0
     allowed = max(1, int(round(budget * hours)))
     return float(np.sort(pool)[-allowed]), hours, allowed
-
-
-def refractory_count(times, seconds=REFRACTORY_S):
-    times = np.sort(np.asarray(times, float))
-    n, last = 0, -np.inf
-    for t in times:
-        if t >= last + seconds:
-            n, last = n + 1, t
-    return n
 
 
 def latch(frame, scores, thr):
@@ -213,7 +248,7 @@ def latch(frame, scores, thr):
             "mission_type": g["mission_type"].iloc[0],
             "attack_type": g["attack_type"].iloc[0],
             "velocity_mode": g["velocity_mode"].iloc[0], "attacked": attacked,
-            "alarms": refractory_count(hit["window_end_s"]),
+            "alarms": refractory_count(hit["window_end_s"], REFRACTORY_S),
             "detected": bool(len(after)),
             "delay_s": float(after["seconds_since_onset_end"].iloc[0])
             if len(after) else np.nan,
@@ -221,43 +256,28 @@ def latch(frame, scores, thr):
     return pd.DataFrame(rows)
 
 
-def window_metrics(y, s, thr):
-    y = np.asarray(y).astype(int)
-    pred = (np.asarray(s) > thr).astype(int)
-    tn, fp, fn, tp = confusion_matrix(y, pred, labels=[0, 1]).ravel()
-    prec = tp / (tp + fp) if tp + fp else 0.0
-    rec = tp / (tp + fn) if tp + fn else 0.0
-    return {
-        "windows": len(y), "positives": int(y.sum()),
-        "accuracy": (tp + tn) / len(y) if len(y) else np.nan,
-        "precision": prec, "recall": rec,
-        "f1": 2 * prec * rec / (prec + rec) if prec + rec else 0.0,
-        "roc_auc": auc(y, s), "tn": int(tn), "fp": int(fp), "fn": int(fn),
-        "tp": int(tp),
-    }  # fmt: skip
-
-
-def poisson_upper(k, hours, level=0.95):
-    return float(chi2.ppf(level, 2 * (k + 1)) / 2.0 / hours) if hours > 0 else np.nan
-
-
 # -------------------------------------------------------------- protocols --
 
 
-def run_protocol(name, params_grid, orig, syn, cols, hours, held_out=None):
-    tr, va, clean_va, o_test, s_test = protocol_sets(orig, syn, held_out)
-    params, tuning = tune(name, params_grid, tr, va, cols)
-    final = fit(name, params, tr, cols)
+def protocol_name(protocol, held):
+    return "seen" if protocol == "seen" else f"{protocol}_{held}"
+
+
+def evaluate_seed(name, params, sets, cols, hours, protocol, held, seed):
+    """Fit, calibrate and score one model at one seed on one protocol."""
+    tr, va, clean_va, o_test, s_test = sets
+    final = fit(name, params, tr, cols, seed)
     thr, pool_h, allowed = threshold_for(
-        clean_pool(name, params, tr, clean_va, final, cols)
+        clean_pool(name, params, tr, clean_va, final, cols, seed)
     )
     so, ss = score(name, final, o_test, cols), score(name, final, s_test, cols)
-    proto = "seen" if held_out is None else f"unseen_{held_out}"
-    lab = o_test[Y] >= 0
-    win = {"protocol": proto, "model": name, "params": json.dumps(params),
-           "threshold": thr, "calibration_hours": pool_h,
-           "calibration_alarms": allowed,
-           **window_metrics(o_test.loc[lab, Y], so[lab.to_numpy()], thr)}  # fmt: skip
+    proto = protocol_name(protocol, held)
+    lab = (o_test[Y] >= 0).to_numpy()
+    win = {"protocol": proto, "model": name, "seed": seed,
+           "params": json.dumps(params), "threshold": thr,
+           "calibration_hours": pool_h, "calibration_alarms": allowed}  # fmt: skip
+    if lab.any() and protocol != "cvfa":
+        win.update(window_metrics(o_test.loc[lab, Y], so[lab], thr))
     neg = so[(o_test[Y] == 0).to_numpy()]
     for mode in ("position_only", "consistent"):
         m = (
@@ -270,96 +290,159 @@ def run_protocol(name, params_grid, orig, syn, cols, hours, held_out=None):
     flights = pd.concat(
         [latch(o_test, so, thr), latch(s_test, ss, thr)], ignore_index=True
     )
+    flights.insert(0, "seed", seed)
     flights.insert(0, "model", name)
     flights.insert(0, "protocol", proto)
     normal = flights[~flights["attacked"]]
-    h = float(hours.reindex(normal["flight_id"]).sum())
     if normal["flight_id"].isin(hours.index).mean() < 1:
         raise SystemExit("normal test flights missing from signals_index.csv")
+    h = float(hours.reindex(normal["flight_id"]).sum())
     k = int(normal["alarms"].sum())
     win.update({"fa_flights": len(normal), "fa_alarms": k, "fa_hours": h,
                 "fa_per_hour": k / h if h else np.nan,
                 "fa_upper_95": poisson_upper(k, h)})  # fmt: skip
-    tuning.insert(0, "model", name)
-    tuning.insert(0, "protocol", proto)
-    return win, flights, tuning
+    return win, flights
+
+
+def run_protocol(name, params_grid, orig, syn, cols, hours, held=None,
+                 protocol=None, seeds=(SEED,), fold_of=None, params=None):  # fmt: skip
+    """Tune once (unless params are given), then evaluate every seed."""
+    protocol = protocol or ("seen" if held is None else "mission")
+    sets = protocol_sets(orig, syn, held, protocol, fold_of)
+    tuning = pd.DataFrame()
+    if params is None:
+        params, tuning = tune(name, params_grid, sets[0], sets[1], cols)
+        tuning.insert(0, "model", name)
+        tuning.insert(0, "protocol", protocol_name(protocol, held))
+    wins, flights = [], []
+    for seed in seeds:
+        w, f = evaluate_seed(name, params, sets, cols, hours, protocol, held, seed)
+        wins.append(w)
+        flights.append(f)
+    return wins, pd.concat(flights, ignore_index=True), tuning, params
+
+
+GROUPS = {"seen": "seen", "mission": "unseen missions", "type": "unseen attack types",
+          "cvfa": "cross-validated false alarms"}  # fmt: skip
+
+
+def group_of(protocol):
+    # Step B saved the held-out missions as unseen_<mission>; later runs mission_<m>
+    head = protocol.split("_")[0]
+    return GROUPS["mission" if head == "unseen" else head]
 
 
 def summary(windows, flights):
-    """One row per model and protocol (unseen = the three held-out missions pooled)."""
-    f = flights.assign(
-        group=np.where(flights["protocol"] == "seen", "seen", "unseen missions")
-    )
-    w = windows.assign(
-        group=np.where(windows["protocol"] == "seen", "seen", "unseen missions")
-    )
-    rows = []
-    for (grp, model), g in f.groupby(["group", "model"], sort=False):
-        ww = w[(w["group"] == grp) & (w["model"] == model)]
-        tp, fp, fn, tn = (int(ww[c].sum()) for c in ("tp", "fp", "fn", "tn"))
-        prec = tp / (tp + fp) if tp + fp else 0.0
-        rec = tp / (tp + fn) if tp + fn else 0.0
+    """Per model, protocol group and seed, then mean and sd over seeds."""
+    f = flights.assign(group=flights["protocol"].map(group_of))
+    w = windows.assign(group=windows["protocol"].map(group_of))
+    per = []
+    for (grp, model, seed), g in f.groupby(["group", "model", "seed"], sort=False):
+        ww = w[(w["group"] == grp) & (w["model"] == model) & (w["seed"] == seed)]
+        row = {"protocol": grp, "model": model, "seed": seed}
+        if {"tp", "fp", "fn", "tn"} <= set(ww.columns) and ww["tp"].notna().any():
+            tp, fp, fn, tn = (int(ww[c].sum()) for c in ("tp", "fp", "fn", "tn"))
+            prec = tp / (tp + fp) if tp + fp else 0.0
+            rec = tp / (tp + fn) if tp + fn else 0.0
+            row.update({
+                "accuracy": (tp + tn) / (tp + tn + fp + fn), "precision": prec,
+                "recall": rec,
+                "f1": 2 * prec * rec / (prec + rec) if prec + rec else 0.0,
+                "roc_auc": float(ww["roc_auc"].mean()),
+                "tn": tn, "fp": fp, "fn": fn, "tp": tp,
+            })  # fmt: skip
+        row["auc_syn_position_only"] = float(ww["auc_syn_position_only"].mean())
+        row["auc_syn_consistent"] = float(ww["auc_syn_consistent"].mean())
         real = g[g["attacked"] & (g["origin"] == "orig")]
         po = g[g["attacked"] & (g["velocity_mode"] == "position_only")]
         cv = g[g["attacked"] & (g["velocity_mode"] == "consistent")]
+        att = g[g["attacked"]]
         k, h = int(ww["fa_alarms"].sum()), float(ww["fa_hours"].sum())
-        rows.append({
-            "protocol": grp, "model": model,
-            "accuracy": (tp + tn) / (tp + tn + fp + fn), "precision": prec,
-            "recall": rec, "f1": 2 * prec * rec / (prec + rec) if prec + rec else 0.0,
-            "roc_auc": float(ww["roc_auc"].mean()),
-            "auc_syn_position_only": float(ww["auc_syn_position_only"].mean()),
-            "auc_syn_consistent": float(ww["auc_syn_consistent"].mean()),
-            "tn": tn, "fp": fp, "fn": fn, "tp": tp,
-            "real_detected": float(real["detected"].mean()),
-            "real_delay_s": float(real.loc[real["detected"], "delay_s"].median()),
-            "position_only_detected": float(po["detected"].mean()),
-            "consistent_detected": float(cv["detected"].mean()),
+        row.update({
+            "detected": float(att["detected"].mean()) if len(att) else np.nan,
+            "real_detected": float(real["detected"].mean()) if len(real) else np.nan,
+            "real_delay_s": float(real.loc[real["detected"], "delay_s"].median())
+            if real["detected"].any() else np.nan,
+            "position_only_detected": float(po["detected"].mean())
+            if len(po) else np.nan,
+            "consistent_detected": float(cv["detected"].mean()) if len(cv) else np.nan,
             "fa_alarms": k, "fa_hours": h, "fa_per_hour": k / h if h else np.nan,
             "fa_upper_95": poisson_upper(k, h),
         })  # fmt: skip
-    return pd.DataFrame(rows)
+        per.append(row)
+    per = pd.DataFrame(per)
+    keys = ["protocol", "model"]
+    vals = [c for c in per.columns if c not in keys + ["seed"]]
+    mean = per.groupby(keys, sort=False)[vals].mean()
+    sd = per.groupby(keys, sort=False)[vals].std().add_suffix("_sd")
+    out = mean.join(sd)
+    out["seeds"] = per.groupby(keys, sort=False)["seed"].nunique()
+    return out.reset_index(), per
 
 
-def run(models=MODELS, quick=False, out_dir=None):
+def run(models=MODELS, quick=False, out_dir=None, full=False):
     out = Path(out_dir) if out_dir else OUT_DIR
     out.mkdir(parents=True, exist_ok=True)
     cfg = yaml.safe_load(CONFIG.read_text())["models"]
     orig, syn = load(OUT_DIR)  # inputs always come from Module 05's own folder
     cols = feature_columns(orig)
     hours = pd.read_csv(SIGNALS_INDEX).set_index("flight_id")["vel_hours"]
-    protocols = [None] if quick else [None, *MISSIONS]
+    normals = orig[orig["attack_type"] == "none"].drop_duplicates("flight_id")
+    fold_of = folds_of(normals[["flight_id", "mission_type"]])
+    protocols = [("seen", None)]
+    if not quick:
+        protocols += [("mission", m) for m in MISSIONS]
+    if full:
+        protocols += [("type", f) for f in FAMILIES]
+        protocols += [("cvfa", str(k)) for k in range(CV_FOLDS)]
     print("=" * 78)
     print("AEROVIGIL - PLAN M5: SIX CLASSICAL MODELS, EVENT LABELS, LATCHED")
     print("=" * 78)
     print(
         f"windows: real {len(orig):,}, synthetic main {len(syn):,}   features "
         f"{len(cols)}   budget {BUDGET_PER_HOUR:g}/h   refractory {REFRACTORY_S:g} s"
+        f"   protocols {len(protocols)}"
     )
     started, wins, flights, tunes = time.time(), [], [], []
     for name in models:
         params_grid = grid(cfg[name])
         if quick:
             params_grid = params_grid[:1]
-        for held in protocols:
-            w, f, t = run_protocol(name, params_grid, orig, syn, cols, hours, held)
-            wins.append(w)
+        seeds = SEEDS if (full and name in STOCHASTIC) else (SEED,)
+        seen_params = None
+        for protocol, held in protocols:
+            # the false-alarm folds reuse the seen setting: they measure the
+            # calibration on unseen normal flights, not the tuning
+            given = seen_params if protocol == "cvfa" else None
+            w, f, t, params = run_protocol(
+                name, params_grid, orig, syn, cols, hours, held, protocol,
+                seeds if protocol != "cvfa" else (SEED,), fold_of, given,
+            )  # fmt: skip
+            if protocol == "seen":
+                seen_params = params
+            wins += w
             flights.append(f)
             tunes.append(t)
+            last = w[-1]
             print(
-                f"  {name:20s} {w['protocol']:16s} AUC {w['roc_auc']:.3f}  "
-                f"F1 {w['f1']:.3f}  FA {w['fa_alarms']}/{w['fa_hours']:.2f} h  "
-                f"best {w['params']}   [{time.time() - started:.0f} s]"
+                f"  {name:20s} {last['protocol']:28s} seeds {len(w)}  "
+                f"AUC {last.get('roc_auc', np.nan):.3f}  "
+                f"FA {last['fa_alarms']}/{last['fa_hours']:.2f} h  "
+                f"best {last['params']}   [{time.time() - started:.0f} s]",
+                flush=True,
             )
     windows = pd.DataFrame(wins)
     flights = pd.concat(flights, ignore_index=True)
-    windows.to_csv(out / "all_models_window.csv", index=False)
-    flights.to_csv(out / "all_models_flight.csv", index=False)
+    suffix = "_full" if full else ""
+    windows.to_csv(out / f"all_models_window{suffix}.csv", index=False)
+    flights.to_csv(out / f"all_models_flight{suffix}.csv", index=False)
     pd.concat(tunes, ignore_index=True).to_csv(
-        out / "all_models_tuning.csv", index=False
+        out / f"all_models_tuning{suffix}.csv", index=False
     )
-    table = summary(windows, flights)
-    table_path = out / TABLE.name if (quick or out_dir) else TABLE
+    table, per = summary(windows, flights)
+    per.to_csv(out / f"all_models_per_seed{suffix}.csv", index=False)
+    target = TABLE_FULL if full else TABLE
+    table_path = out / target.name if (quick or out_dir) else target
     table_path.parent.mkdir(parents=True, exist_ok=True)
     table.to_csv(table_path, index=False)
     report(table)
@@ -369,26 +452,39 @@ def run(models=MODELS, quick=False, out_dir=None):
 
 def report(table):
     pd.set_option("display.width", 250)
-    order = {"seen": 1, "unseen missions": 0}  # plan: lead with unseen missions
-    t = table.sort_values(["protocol", "model"], key=lambda s: s.map(order).fillna(s))
-    show = t[["protocol", "model", "accuracy", "precision", "recall", "f1",
-              "roc_auc", "auc_syn_consistent", "real_detected", "real_delay_s",
-              "consistent_detected", "fa_alarms", "fa_hours",
-              "fa_per_hour"]]  # fmt: skip
+    order = {
+        "unseen missions": 0,
+        "unseen attack types": 1,
+        "seen": 2,
+        "cross-validated false alarms": 3,
+    }  # plan: lead with unseen missions
+    t = table.sort_values(
+        ["protocol", "model"], key=lambda s: s.map(order) if s.name == "protocol" else s
+    )  # fmt: skip
+    cols = ["protocol", "model", "seeds", "accuracy", "precision", "recall", "f1",
+            "roc_auc", "auc_syn_consistent", "detected", "real_detected", "real_delay_s",
+            "consistent_detected", "fa_alarms", "fa_hours", "fa_per_hour"]  # fmt: skip
     print("\nWINDOW METRICS (event labels, real test windows, at the latch threshold)")
-    print("and FLIGHT METRICS (latched); unseen missions = three held-out missions")
-    print(show.round(3).to_string(index=False))
-    print("\nCONFUSION MATRICES (windows)")
-    print(t[["protocol", "model", "tn", "fp", "fn", "tp"]].to_string(index=False))
+    print("and FLIGHT METRICS (latched); mean over seeds where a model has them")
+    print(t[[c for c in cols if c in t]].round(3).to_string(index=False))
+    if "tp" in t:
+        print("\nCONFUSION MATRICES (windows, mean over seeds)")
+        cm = t[t["tp"].notna()][["protocol", "model", "tn", "fp", "fn", "tp"]]
+        print(cm.round(1).to_string(index=False))
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--models", default=",".join(MODELS))
     ap.add_argument("--quick", action="store_true", help="first grid point, seen only")
+    ap.add_argument(
+        "--full",
+        action="store_true",
+        help="plan M9: five seeds, unseen attack types and CV false alarms",
+    )
     ap.add_argument("--output-dir", default=None)
     a = ap.parse_args()
-    run(tuple(a.models.split(",")), a.quick, a.output_dir)
+    run(tuple(a.models.split(",")), a.quick, a.output_dir, a.full)
 
 
 if __name__ == "__main__":

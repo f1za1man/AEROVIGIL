@@ -1,0 +1,27 @@
+{
+  "mu": 0.05180938541889191,
+  "sd": 0.0037225079722702503,
+  "kalman": 23.213842391967773,
+  "velocity": 16.21621417999268,
+  "fused_kalman": 25.556079864501953,
+  "fused_velocity": 18.766091346740726,
+  "fused_shares": {
+    "kalman": 2,
+    "velocity": 2
+  },
+  "hours": {
+    "kalman": 3.7811000008333298,
+    "velocity": 4.49579666638888,
+    "fused": 4.49579666638888
+  },
+  "allowed": {
+    "kalman": 3,
+    "velocity": 4,
+    "fused": 4
+  },
+  "used": {
+    "kalman": 3,
+    "velocity": 4,
+    "fused": 4
+  }
+}

@@ -48,7 +48,7 @@ VELOCITY = "res_horizontal_velocity_roll_mean"
 CHANNELS = (COURSE, VELOCITY)
 REFRACTORY_S = 10.0
 BUDGET_PER_HOUR = 1.0
-HZ = 125.0
+MAX_GAP_S = 1.0
 
 
 def channel_values(frame, channels=CHANNELS):
@@ -93,8 +93,20 @@ def alarm_indices(score, t, valid, threshold, refractory_s=REFRACTORY_S):
     return np.asarray(out, dtype=int)
 
 
-def monitored_hours(valid, hz=HZ):
-    return float(np.count_nonzero(valid)) / hz / 3600.0
+def monitored_hours(valid, t, max_gap=MAX_GAP_S):
+    """Hours covered by valid rows, measured from the timestamps.
+
+    An earlier version divided the row count by a fixed 125 Hz, but these flights log
+    at about 125 or 250 Hz (172 rows per second on average), which overstated the
+    monitored time by about 38% and made the false-alarm rate look lower than it was.
+    """
+    t = np.asarray(t, float)
+    valid = np.asarray(valid, bool)
+    if len(t) < 2:
+        return 0.0
+    dt = np.diff(t)
+    both = valid[1:] & valid[:-1] & (dt > 0) & (dt <= max_gap)
+    return float(dt[both].sum()) / 3600.0
 
 
 def calibrate(clean, budget=BUDGET_PER_HOUR, refractory_s=REFRACTORY_S, grid=None):
@@ -103,7 +115,7 @@ def calibrate(clean, budget=BUDGET_PER_HOUR, refractory_s=REFRACTORY_S, grid=Non
     clean: list of (score, t, valid) tuples, one per calibration flight. Alarms are
     counted per flight, because the statistic resets between flights.
     """
-    hours = sum(monitored_hours(v) for _, _, v in clean)
+    hours = sum(monitored_hours(v, t) for _, t, v in clean)
     allowed = max(1, int(round(budget * hours)))
     pool = np.concatenate([s[v] for s, _, v in clean]) if clean else np.zeros(1)
     if grid is None:
@@ -123,7 +135,7 @@ def flight_verdict(score, t, valid, truth, threshold, refractory_s=REFRACTORY_S)
     """
     idx = alarm_indices(score, t, valid, threshold, refractory_s)
     on = truth["label"] == 1
-    out = {"n_alarms": int(len(idx)), "monitored_hours": monitored_hours(valid)}
+    out = {"n_alarms": int(len(idx)), "monitored_hours": monitored_hours(valid, t)}
     if not on.any():
         return {**out, "attacked": False, "detected": False, "delay_s": np.nan,
                 "displacement_m": np.nan, "false_alarms": int(len(idx))}  # fmt: skip

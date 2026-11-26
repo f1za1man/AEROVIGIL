@@ -199,11 +199,17 @@ def run_flight(g, cols, fcfg, conv, scale, noise_scale=1.0, truth=None):
             df["offset_n"] = truth["offset_n"][rows]
             df["offset_m"] = truth["offset_m"][rows]
             df["rel_start_s"] = truth["rel_start"][rows]
+            if "t_s" in truth:
+                # t_s above counts from the first row the filter kept, which is later
+                # than the flight's own zero when the log opens with dropout rows.
+                # This is the base table's own time of the same row, for callers
+                # that compare filter ticks with times taken from the base table.
+                df["row_t_s"] = truth["t_s"][rows]
         frames.append(df)
     if not frames:
         return None
     out = pd.concat(frames, ignore_index=True)
     for c in out.columns:
         if out[c].dtype == "float64":
-            out[c] = out[c].astype("float32") if c not in ("t_s",) else out[c]
+            out[c] = out[c].astype("float32") if c not in ("t_s", "row_t_s") else out[c]
     return out

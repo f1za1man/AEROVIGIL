@@ -161,6 +161,20 @@ def test_the_score_is_the_largest_channel_and_survives_a_nan(clean_fit):
     assert half[0][0] == 4.0 and bool(half[1][0])  # one live channel still counts
 
 
+def test_monitored_time_comes_from_timestamps_not_row_counts():
+    """A 250 Hz flight and a 125 Hz flight of equal length cover equal time."""
+    fast = np.arange(0, 60, 1 / 250.0)
+    slow = np.arange(0, 60, 1 / 125.0)
+    h_fast = monitored_hours(np.ones(len(fast), bool), fast)
+    h_slow = monitored_hours(np.ones(len(slow), bool), slow)
+    assert h_fast == pytest.approx(60 / 3600, rel=1e-3)
+    assert h_slow == pytest.approx(h_fast, rel=1e-3)
+    gap = np.r_[np.arange(0, 30, 0.01), np.arange(100, 130, 0.01)]  # a 70 s logging gap
+    assert monitored_hours(np.ones(len(gap), bool), gap) == pytest.approx(
+        60 / 3600, rel=1e-2
+    )
+
+
 def test_alarms_respect_the_refractory_period():
     t = np.arange(0, 60, 0.5)
     s = np.full(len(t), 9.0)
@@ -181,7 +195,7 @@ def test_calibration_fits_the_alarm_budget(clean_fit):
         t, s, v, _ = scored(g, mu, sd)
         clean.append((s, t, v))
     thr, hours, allowed, used = calibrate(clean, budget=1.0)
-    assert hours == pytest.approx(sum(monitored_hours(v) for _, _, v in clean))
+    assert hours == pytest.approx(sum(monitored_hours(v, t) for _, t, v in clean))
     assert used <= allowed and allowed >= 1
     assert np.isfinite(thr) and thr > 0
 

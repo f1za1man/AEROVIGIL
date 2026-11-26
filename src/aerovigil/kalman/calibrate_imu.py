@@ -79,6 +79,9 @@ def main():
     out_dir.mkdir(parents=True, exist_ok=True)
 
     report = pd.read_csv(resolve(cfg["paths"]["cleaning_report"]))
+    if "attack_rows" not in report.columns:  # Module 03 v2 report
+        report = report.rename(columns={"mission": "mission_type"})
+        report["attack_rows"] = report["attacked"].astype(int)
     split_map, _, _ = load_split_map(resolve(cfg["paths"]["flight_splits"]))
     pool = report[
         (report["attack_rows"] == 0)
@@ -108,6 +111,11 @@ def main():
     data = []
     for _, r in pool.iterrows():
         g = pd.read_parquet(resolve(cfg["paths"]["cleaned_dir"]) / r["file"])
+        if "aligned_all" in g.columns:
+            # Module 03 v2 keeps IMU and barometer dropouts as NaN rows. One NaN in
+            # the running sum below makes every later value NaN, every score NaN, and
+            # then no convention is accepted, so the rows go first, as in run_flight.
+            g = g[g["aligned_all"].to_numpy() == 1].reset_index(drop=True)
         t, j, ok, a_gps = sample_pairs(g, cols, scale, icfg["lag_s"])
         acc = g[cols["accel"]].to_numpy(float)
         q = g[cols["quat"]].to_numpy(float)
@@ -223,7 +231,19 @@ def main():
             f"{mag_info:.1f} deg (circular std) -> "
             f"{'consistent with the attitude estimate' if mag_info < 15 else 'NOT constant'}"
         )
-    with (out_dir / "imu_convention.json").open("w") as f:
+    target = out_dir / "imu_convention.json"
+    previous = (
+        json.loads(target.read_text()).get("convention") if target.is_file() else None
+    )
+    if conv is None and previous is not None and "--force" not in sys.argv:
+        print(
+            f"\n  NOT SAVED: {target} already holds the accepted convention {previous}."
+            "\n  Overwriting it with 'no IMU' would make every later module run its"
+            "\n  filter without the accelerometer. Re-run with --force to overwrite."
+        )
+        print("=" * 65)
+        return
+    with target.open("w") as f:
         json.dump(
             {
                 "convention": conv,

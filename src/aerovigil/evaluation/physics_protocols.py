@@ -194,9 +194,13 @@ def cusum_verdict(idx, inn):
     start, end = t[on][0], t[on][-1]
     inside = idx[(t[idx] >= start) & (t[idx] <= end)]
     hit = len(inside) > 0
+    delay = np.nan
+    if hit:  # real flights carry no seconds-since-onset: time from the window start
+        rel = inn["rel"][inside[0]]
+        delay = float(rel) if np.isfinite(rel) else float(t[inside[0]] - start)
     return {
         "detected": hit,
-        "delay_s": float(inn["rel"][inside[0]]) if hit else np.nan,
+        "delay_s": delay,
         "displacement_m": float(inn["offset"][inside[0]]) if hit else np.nan,
         "alarms": int((t[idx] < start).sum()),
     }  # fmt: skip

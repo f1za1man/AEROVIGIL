@@ -334,6 +334,11 @@ def group_of(protocol):
 
 def summary(windows, flights):
     """Per model, protocol group and seed, then mean and sd over seeds."""
+    # Step B's results predate seeds: one run, at the default seed
+    if "seed" not in flights:
+        flights = flights.assign(seed=SEED)
+    if "seed" not in windows:
+        windows = windows.assign(seed=SEED)
     f = flights.assign(group=flights["protocol"].map(group_of))
     w = windows.assign(group=windows["protocol"].map(group_of))
     per = []

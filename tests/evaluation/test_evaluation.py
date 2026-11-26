@@ -76,6 +76,8 @@ def test_cusum_verdict_reads_window_and_delay_from_the_ticks():
     i = int(np.searchsorted(t, 12.0))
     v = cusum_verdict(np.array([i]), inn)
     assert v["detected"] and v["delay_s"] == pytest.approx(1.5)
+    real = {**inn, "rel": np.full_like(t, np.nan)}  # real flights: no onset column
+    assert cusum_verdict(np.array([i]), real)["delay_s"] == pytest.approx(2.0)
 
 
 # ------------------------------------------------------------ LSTM masks --

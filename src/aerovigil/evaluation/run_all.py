@@ -57,6 +57,7 @@ import aerovigil.baselines.all_models_v2 as am
 from aerovigil.evaluation import ablations, compare_runs, lstm_protocols
 from aerovigil.evaluation import physics_protocols as phys
 from aerovigil.evaluation import store
+from aerovigil.stealth import detectors as D
 
 ROOT = Path(__file__).resolve().parents[3]
 TABLES = ROOT / "reports" / "tables"
@@ -88,8 +89,8 @@ def classical(full):
     if w is None or f is None:
         return None
     table, _ = am.summary(w, f)
-    table.to_csv(TABLES / ("C_classical_models.csv" if full else
-                           "B_classical_models.csv"), index=False)  # fmt: skip
+    D.save_csv(table, TABLES / ("C_classical_models.csv" if full else
+                                "B_classical_models.csv"))  # fmt: skip
     return table
 
 
@@ -98,7 +99,7 @@ def physics():
     if f is None:
         return None
     table = phys.summarise(f)
-    table.to_csv(phys.TABLE, index=False)
+    D.save_csv(table, phys.TABLE)
     return table
 
 
@@ -108,7 +109,7 @@ def lstm():
     if f is None or w is None:
         return None
     table, _ = lstm_protocols.summarise(f, w)
-    table.to_csv(lstm_protocols.TABLE, index=False)
+    D.save_csv(table, lstm_protocols.TABLE)
     return table
 
 
@@ -118,7 +119,7 @@ def ablation():
     if w is None or f is None:
         return None
     table = ablations.summarise(w, f, ablations.magnetometer_features())
-    table.to_csv(ablations.TABLE, index=False)
+    D.save_csv(table, ablations.TABLE)
     return table
 
 
@@ -134,7 +135,7 @@ def stealth():
     frontier.finish(fixed, time.time())
     exam = read(sd.OUT / "adaptive_exam.csv")
     if exam is not None:
-        adaptive.summarise(exam).to_csv(adaptive.TABLE, index=False)
+        D.save_csv(adaptive.summarise(exam), adaptive.TABLE)
     wb, free = read(sd.OUT / "whitebox_flights.csv"), read(sd.OUT / "whitebox_free.csv")
     if wb is not None:
         whitebox.finish(wb, free if free is not None else pd.DataFrame())
@@ -207,7 +208,7 @@ def run():
     if combined is not None and any(x is None for x in (cls, phy, lst)):
         print("  C_all_detectors.csv kept as it is: some of its results are missing")
     elif combined is not None:
-        combined.to_csv(TABLES / "C_all_detectors.csv", index=False)
+        D.save_csv(combined, TABLES / "C_all_detectors.csv")
         pd.set_option("display.width", 250)
         print("\nEVERY DETECTOR (unseen missions first)")
         print(combined.round(3).to_string(index=False))

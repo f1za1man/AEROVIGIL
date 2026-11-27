@@ -336,20 +336,20 @@ def summarise(alarms=None, with_shap=True):
     check_complete(alarms)
     TABLES.mkdir(parents=True, exist_ok=True)
     normals = R.build_normals()
-    R.as_frame(normals).to_csv(TABLES / "E_normals.csv", index=False)
-    reason_table(alarms).to_csv(TABLES / "E_top_reasons.csv", index=False)
+    D.save_csv(R.as_frame(normals), TABLES / "E_normals.csv")
+    D.save_csv(reason_table(alarms), TABLES / "E_top_reasons.csv")
     ex = examples(alarms)
-    ex.to_csv(TABLES / "E_example_messages.csv", index=False)
+    D.save_csv(ex, TABLES / "E_example_messages.csv")
     a, summary, sil = kmeans(alarms)
-    summary.to_csv(TABLES / "E_kmeans.csv", index=False)
-    sil.to_csv(TABLES / "E_kmeans_silhouette.csv", index=False)
+    D.save_csv(summary, TABLES / "E_kmeans.csv")
+    D.save_csv(sil, TABLES / "E_kmeans_silhouette.csv")
     a[["flight_id", "family", "cluster", "cluster_best_k"]].to_csv(
         R.OUT / "alarm_clusters.csv", index=False
     )
     g = None
     if with_shap:
         g = shap_global()
-        g.to_csv(TABLES / "E_shap_global.csv", index=False)
+        D.save_csv(g, TABLES / "E_shap_global.csv")
     elif (TABLES / "E_shap_global.csv").is_file():
         g = pd.read_csv(TABLES / "E_shap_global.csv")
     plt.rcParams.update({"font.size": 9, "axes.edgecolor": INK2,

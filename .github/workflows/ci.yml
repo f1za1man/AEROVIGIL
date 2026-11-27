@@ -47,6 +47,6 @@ jobs:
         run: |
           report=$(python .github/compare_results.py)
           echo "$report"
-          if [ "$report" != "no result changed" ]; then
+          if [ "$(echo "$report" | tail -n 1)" = "RESULT differ" ]; then
             echo "::warning title=rebuilt results differ::$(echo "$report" | head -30 | awk '{printf "%s%%0A", $0}')"
           fi

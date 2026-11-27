@@ -1,6 +1,7 @@
 # Format, lint, tests, and the smoke run (tables + Stealth Frontier figure rebuilt
 # from the committed per-flight results). The dataset is not in the repository, so
-# tests that need it are skipped here.
+# tests that need it are skipped here. Each part is its own step; on failure the last
+# lines of its output are posted as an annotation on the run.
 name: tests
 
 on:
@@ -12,9 +13,15 @@ jobs:
   smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      AEROVIGIL_ALLOW_MISSING_DATA: "1"
+      MPLBACKEND: Agg
+    defaults:
+      run:
+        shell: bash
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           cache: pip
@@ -24,7 +31,19 @@ jobs:
           pip install torch==2.15.0 --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements.txt -r requirements-dev.txt
           pip install -e .
-      - name: Smoke run
-        env:
-          AEROVIGIL_ALLOW_MISSING_DATA: "1"
-        run: make smoke
+      - name: Format (black)
+        run: .github/report.sh black python -m black --check --line-length 88 src/aerovigil tests app
+      - name: Lint (ruff)
+        run: .github/report.sh ruff python -m ruff check src/aerovigil tests app
+      - name: Tests (pytest)
+        run: .github/report.sh pytest python -m pytest tests -q -rfE
+      - name: Rebuild every table
+        run: .github/report.sh tables python src/aerovigil/evaluation/run_all.py
+      - name: Redraw the Stealth Frontier figure
+        run: .github/report.sh figure python src/aerovigil/stealth/figures.py
+      - name: Results unchanged by the rebuild
+        run: |
+          changed=$(git status --porcelain -- reports data)
+          if [ -n "$changed" ]; then
+            echo "::warning title=rebuilt results differ::$(echo "$changed" | head -20 | awk '{printf "%s%%0A", $0}')"
+          fi

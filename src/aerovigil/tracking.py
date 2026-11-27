@@ -105,12 +105,13 @@ def backfill():
 
     import aerovigil.baselines.all_models_v2 as am
     from aerovigil.evaluation import lstm_protocols as lp
+    from aerovigil.evaluation import store
 
     n = 0
     m05 = am.OUT_DIR
     w, f = m05 / "all_models_window_full.csv", m05 / "all_models_flight_full.csv"
-    if w.is_file() and f.is_file():
-        _, per = am.summary(pd.read_csv(w), pd.read_csv(f))
+    if w.is_file() and store.path_of(f) is not None:
+        _, per = am.summary(pd.read_csv(w), store.read_csv(f))
         for _, r in per.iterrows():
             metrics = r.drop(["protocol", "model", "seed"]).to_dict()
             log_run("aerovigil-m5-classical", f"{r['model']} {r['protocol']} s{r['seed']}",

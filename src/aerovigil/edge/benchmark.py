@@ -60,6 +60,7 @@ from aerovigil.edge import onnx_models as ox
 from aerovigil.edge.streaming import KalmanCheck, VelocityCheck
 from aerovigil.evaluation import lstm_protocols as lp
 from aerovigil.evaluation import physics_protocols as pp
+from aerovigil.evaluation import store
 from aerovigil.evaluation.metrics import false_alarms
 from aerovigil.features.build_features import GAP_FACTOR
 from aerovigil.fusion.fuse import alarms as m10_alarms
@@ -236,7 +237,7 @@ def lstm_part(seeds, hours):
                          & (saved_w["seed"].isin(seeds))].sort_values("seed")  # fmt: skip
         check_same(mine.sort_values("seed"), theirs, f"{kind} windows",
                    ["threshold", "tp", "fp", "fn", "tn", "roc_auc"])  # fmt: skip
-    saved_f = pd.read_csv(lp.PDIR / "flights.csv")
+    saved_f = store.read_csv(lp.PDIR / "flights.csv")
     saved_f = saved_f[(saved_f["protocol"] == "seen") & saved_f["seed"].isin(seeds)]
     mine_f = flights[flights["form"] == "pytorch"]
     a = mine_f.sort_values(["kind", "seed", "flight_id"])

@@ -47,6 +47,7 @@ from aerovigil.consistency.detector import (
 from aerovigil.data.build_raw_base import PHASE_RAMP
 from aerovigil.evaluation import lstm_protocols as lp
 from aerovigil.evaluation import physics_protocols as pp
+from aerovigil.evaluation import store
 from aerovigil.features.build_features_v2 import build_flight_v2
 from aerovigil.fusion.fuse import alarms as m10_alarms
 from aerovigil.fusion.fuse import refractory
@@ -446,7 +447,7 @@ def load_lstm(kind, seed, weights=None, threshold=None):
     model.load_state_dict(state)
     model.eval()
     if threshold is None:
-        f = pd.read_csv(lp.PDIR / "flights.csv", usecols=["name", "threshold"])
+        f = store.read_csv(lp.PDIR / "flights.csv", usecols=["name", "threshold"])
         threshold = float(f.loc[f["name"] == name, "threshold"].iloc[0])
     return model, float(threshold)
 

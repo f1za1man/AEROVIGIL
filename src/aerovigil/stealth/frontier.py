@@ -36,6 +36,7 @@ import pandas as pd
 from aerovigil.baselines.build_window_tables_v2 import OUT_DIR as M05_DIR
 from aerovigil.evaluation import lstm_protocols as lp
 from aerovigil.evaluation import physics_protocols as pp
+from aerovigil.evaluation import store
 from aerovigil.evaluation.metrics import bootstrap_ci, poisson_upper
 from aerovigil.stealth import detectors as D
 from aerovigil.windowing.make_windows_v2 import SECONDS
@@ -93,13 +94,13 @@ def reference():
     p = pd.read_csv(pp.OUT / "physics_flights.csv")
     p = p[p["protocol"] == "seen"][["flight_id", "detector", "detected"]]
     p["seed"] = 0
-    r = pd.read_csv(
+    r = store.read_csv(
         M05_DIR / "all_models_flight_full.csv",
         usecols=["protocol", "model", "seed", "flight_id", "detected"],
     )
     r = r[(r["protocol"] == "seen") & (r["model"] == "random_forest")]
     r = r.rename(columns={"model": "detector"}).drop(columns="protocol")
-    q = pd.read_csv(
+    q = store.read_csv(
         lp.PDIR / "flights.csv",
         usecols=["flight_id", "kind", "protocol", "seed", "detected"],
     )

@@ -33,6 +33,7 @@ import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
 from aerovigil.evaluation import lstm_protocols as lp  # noqa: E402
+from aerovigil.evaluation import store  # noqa: E402
 from aerovigil.explain import reasons as R  # noqa: E402
 from aerovigil.explain.attribution import Explainer, shap_class1  # noqa: E402
 from aerovigil.lstm.models import predict  # noqa: E402
@@ -331,7 +332,7 @@ def fig_clusters(a, summary):
 
 
 def summarise(alarms=None, with_shap=True):
-    alarms = alarms if alarms is not None else pd.read_csv(R.OUT / "alarms.csv")
+    alarms = alarms if alarms is not None else store.read_csv(R.OUT / "alarms.csv")
     check_complete(alarms)
     TABLES.mkdir(parents=True, exist_ok=True)
     normals = R.build_normals()

@@ -9,7 +9,7 @@ Writes reports/tables/A_old_vs_new.csv
 
 Usage:
     python src\aerovigil\evaluation\compare_runs.py
-    python src\aerovigil\evaluation\compare_runs.py --old 61ce18e
+    python src\aerovigil\evaluation\compare_runs.py --old 82f0b70
 """
 
 import argparse
@@ -20,7 +20,7 @@ from pathlib import Path
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[3]
-OLD_COMMIT = "61ce18e"  # last commit before Module 04 was regenerated
+OLD_COMMIT = "82f0b70"  # last commit before Module 04 was regenerated
 OUT = ROOT / "reports" / "tables" / "A_old_vs_new.csv"
 
 

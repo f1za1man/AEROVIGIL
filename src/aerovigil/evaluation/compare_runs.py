@@ -111,7 +111,18 @@ def module10(rows, commit):
                  r[f"{det}_detected_o"], r[f"{det}_detected_n"])  # fmt: skip
 
 
+def have_commit(commit):
+    """True when the old results' commit is in this clone (a shallow clone lacks it)."""
+    done = subprocess.run(["git", "cat-file", "-e", f"{commit}^{{commit}}"],
+                          cwd=ROOT, capture_output=True)  # fmt: skip
+    return done.returncode == 0
+
+
 def run(commit=OLD_COMMIT):
+    if not have_commit(commit):
+        print(f"Commit {commit} is not in this clone (shallow?): "
+              f"{OUT.name} kept as committed")  # fmt: skip
+        return pd.read_csv(OUT) if OUT.is_file() else None
     rows = []
     for f in (module05, module06, module07, module09, module10):
         f(rows, commit)

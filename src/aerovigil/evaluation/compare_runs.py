@@ -20,7 +20,7 @@ from pathlib import Path
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[3]
-OLD_COMMIT = "6d64964"  # last commit before Module 04 was regenerated
+OLD_COMMIT = "3e2a94c"  # last commit before Module 04 was regenerated
 OUT = ROOT / "reports" / "tables" / "A_old_vs_new.csv"
 
 

@@ -24,6 +24,7 @@ flight and an attack profile it injects the attack exactly as Module 08 and Modu
 did, scores it, and returns only what a black-box attacker may learn.
 """
 
+import io
 import json
 from functools import cached_property
 from pathlib import Path
@@ -55,6 +56,7 @@ from aerovigil.kalman.pipeline import run_flight
 from aerovigil.lstm.models import build_model, predict
 from aerovigil.lstm.sequences_v2 import flight_sequences
 from aerovigil.preprocessing.normalize_features_v2 import CLIP
+from aerovigil.tracking import log_run
 
 ROOT = Path(__file__).resolve().parents[3]
 OUT = ROOT / "data" / "processed" / "stealth"
@@ -79,6 +81,28 @@ def atomic_write(path, write):
     tmp = path.with_name(path.stem + ".partial" + path.suffix)
     write(tmp)
     tmp.replace(path)
+
+
+def save_csv(frame, path):
+    """Write a table unless the file already holds the same values (to 1e-12), so a
+    rebuild from saved results does not churn files with float round-off."""
+    path = Path(path)
+    if path.is_file():
+        old = pd.read_csv(path)
+        new = pd.read_csv(io.StringIO(frame.to_csv(index=False)))
+        if list(old.columns) == list(new.columns) and old.shape == new.shape:
+            num = new.select_dtypes("number").columns
+            same_num = all(
+                old[c].dtype.kind in "fiub"
+                and np.allclose(old[c].to_numpy(float), new[c].to_numpy(float),
+                                rtol=1e-12, atol=1e-12, equal_nan=True)
+                for c in num
+            )  # fmt: skip
+            rest = [c for c in new.columns if c not in num]
+            if same_num and old[rest].astype(str).equals(new[rest].astype(str)):
+                return False
+    atomic_write(path, lambda p: frame.to_csv(p, index=False))
+    return True
 
 
 # ------------------------------------------------------------------ flight --
@@ -399,6 +423,10 @@ def fit_classical(name, seed, extra=None, tag="seen"):
     atomic_write(path, lambda p: joblib.dump({"model": model, "threshold": thr,
                                               "cols": cols, "pool_hours": hours,
                                               "allowed": allowed}, p))  # fmt: skip
+    log_run("aerovigil-m8-hardening" if tag == "hard" else "aerovigil-m5-classical",
+            f"{name} {tag} s{seed}", {"model": name, "tag": tag, "seed": seed, **params},
+            {"threshold": thr, "calibration_hours": hours, "n_train": len(tr)},
+            {"source": "run", "step": "D"})  # fmt: skip
     return model, thr, cols
 
 

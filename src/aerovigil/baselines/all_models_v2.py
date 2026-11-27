@@ -72,6 +72,7 @@ from aerovigil.baselines.models import (
     grid,
     score_model,
 )
+from aerovigil.tracking import log_run
 from aerovigil.evaluation.metrics import (
     poisson_upper,
     refractory_count,
@@ -329,6 +330,13 @@ def run_protocol(name, params_grid, orig, syn, cols, hours, held=None,
     wins, flights = [], []
     for seed in seeds:
         w, f = evaluate_seed(name, params, sets, cols, hours, protocol, held, seed)
+        att = f[f["attacked"]]
+        log_run("aerovigil-m5-classical", f"{name} {w['protocol']} s{seed}",
+                {"model": name, "protocol": w["protocol"], "seed": seed, **params},
+                {**{k: v for k, v in w.items() if k not in ("protocol", "model",
+                                                           "params", "seed")},
+                 "detected": float(att["detected"].mean()) if len(att) else None},
+                {"source": "run"})  # fmt: skip
         wins.append(w)
         flights.append(f)
     return wins, pd.concat(flights, ignore_index=True), tuning, params

@@ -1,6 +1,10 @@
+import os
 from pathlib import Path
 
 import pytest
+
+# tests never write to the project's MLflow store (aerovigil.tracking)
+os.environ["AEROVIGIL_NO_MLFLOW"] = "1"
 
 ROOT = Path(__file__).resolve().parents[1]
 PROC = ROOT / "data" / "processed" / "module03"

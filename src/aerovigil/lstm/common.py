@@ -43,25 +43,4 @@ def set_threads(cfg):
     torch.set_num_threads(int(cfg["training"]["threads"]))
 
 
-class Tracker:
-    """Optional MLflow logging. Does nothing when MLflow is missing or switched off."""
-
-    def __init__(self, enabled, experiment):
-        self.mlflow = None
-        if not enabled:
-            return
-        try:
-            import mlflow
-
-            mlflow.set_tracking_uri(f"sqlite:///{(ROOT / 'mlflow.db').as_posix()}")
-            mlflow.set_experiment(experiment)
-            self.mlflow = mlflow
-        except Exception as e:  # noqa: BLE001
-            print(f"(MLflow disabled: {e})")
-
-    def log(self, name, params, metrics):
-        if self.mlflow is None:
-            return
-        with self.mlflow.start_run(run_name=name):
-            self.mlflow.log_params({k: str(v) for k, v in params.items()})
-            self.mlflow.log_metrics({k: float(v) for k, v in metrics.items()})
+from aerovigil.tracking import Tracker  # noqa: E402,F401  the shared MLflow store

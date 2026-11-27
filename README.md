@@ -2,148 +2,203 @@
 
 ### Intelligent UAV Navigation Integrity Monitoring and Adaptive GPS Spoofing Detection
 
-## Overview
+## The problem
 
-AEROVIGIL is a final-year research project on detecting GPS/GNSS spoofing attacks
-against small unmanned aerial vehicles (multirotors). It compares physics-based
-detectors (a Kalman filter with statistical tests, sensor-consistency checks) with
-classical machine learning and LSTM models on the same flights, at the same
-false-alarm budget, and then attacks them with an adaptive attacker that reshapes its
-drift to avoid detection.
+A small drone trusts its GPS receiver to know where it is. A GPS spoofer broadcasts fake
+satellite signals, and a careful one moves the reported position slowly enough that
+the autopilot follows it without noticing: the drone is steered somewhere else while
+every check looks normal. AEROVIGIL asks three questions on logged flights:
 
-The project uses simulated flight logs only. It does not transmit any GPS signal, and
-no result here has been validated on a real drone.
+1. **Can it be detected?** Physics-based checks (a Kalman filter fed by the IMU and
+   barometer, sensor-consistency tests) are compared with classical machine learning
+   and LSTM models on the same flights, at the same false-alarm budget.
+2. **How far can a smart attacker get?** Each detector is attacked by an adaptive
+   (black-box) and a white-box attacker, and scored on the **Stealth Frontier**: how
+   many metres the drone is moved before the first alarm.
+3. **What then?** Every alarm is explained in plain words, the detectors are timed
+   for a small onboard computer, and a dead-reckoning fallback measures how long the
+   drone can navigate without GPS after an alarm.
+
+This is a final-year research project. It uses simulated flight logs only, never
+transmits any signal, and no result here has been validated on a real drone.
+
+## How it fits together
+
+```mermaid
+flowchart LR
+    A[PX4 SITL flight logs<br/>GPS, raw GPS, IMU,<br/>barometer, magnetometer] --> B[Module 03<br/>aligned base tables,<br/>measured attack phases,<br/>36 residual features]
+    B --> C[Module 04<br/>synthetic attacks:<br/>5 families x 2 modes,<br/>drift sweep]
+    B --> D[Detectors]
+    C --> D
+    subgraph D [Detectors, 1 false alarm per flight-hour]
+        D1[Physics: Kalman chi-square, CUSUM,<br/>velocity, consistency, fused]
+        D2[Learned: 6 classical models,<br/>LSTM autoencoder, supervised LSTM]
+    end
+    D --> E[Evaluation<br/>seen / unseen missions,<br/>unseen attack types,<br/>cross-validated false alarms]
+    D --> F[Stealth Frontier<br/>fixed, adaptive and<br/>white-box attackers,<br/>hardening]
+    D --> G[Explain<br/>3 reasons +<br/>operator message]
+    D --> H[Edge benchmark<br/>ONNX, int8, 1 thread]
+    D --> I[Fallback<br/>dead reckoning<br/>after the alarm]
+    E & F & G --> J[Offline demo<br/>dashboard]
+```
+
+| Plan module | What | Code |
+|---|---|---|
+| M3 | Base data from the raw sensor streams, measured attack phases (normal / pre / ramp / plateau / post), 36 residual features | `data/`, `features/`, `preprocessing/`, `windowing/` |
+| M4 | Synthetic attacks: abrupt jump, constant offset, linear drift, exponential ramp, low-amplitude wander; each position-only and velocity-consistent | `attacks/` |
+| M5 | Logistic regression, Naive Bayes, KNN, decision tree, random forest, isolation forest on 5 s window statistics | `baselines/` |
+| M6 | Kalman filter (IMU-driven, barometer-aided) with a chi-square (NIS) test and CUSUM | `kalman/` |
+| M7 | LSTM autoencoder and supervised LSTM | `lstm/` |
+| M8 | Adaptive black-box attacker, white-box attacker, Stealth Frontier, hardening | `adaptive/`, `stealth/` |
+| extra | Consistency detector; fused detector and threat model | `consistency/`, `fusion/` |
+| M9 | One evaluation framework for every detector: protocols, 5 seeds, ablations | `evaluation/` |
+| M10 | Three reasons and an operator message for every alarm, SHAP, clustering | `explain/` |
+| M11 | ONNX export, int8 quantisation, one-thread latency, streaming physics detectors | `edge/` |
+| M12 | Dead-reckoning fallback after an alarm | `mitigation/` |
+| M13 | Offline demo dashboard | `app/`, `demo/` |
+
+Every alarm rate in the project uses the same budget: **1 false alarm per flight-hour**,
+calibrated on clean training flights only, with time taken from the log timestamps, a
+10 s refractory period, and a Poisson 95% upper bound reported with the count and hours.
 
 ## Dataset
 
-PX4 SITL + Gazebo UAV GPS-spoofing dataset (Anthony Finn): 360 flights (216 attacked,
+PX4 SITL + Gazebo UAV GPS-spoofing dataset by Anthony Finn
+(<https://github.com/anthony-finn/UAV-GPS-Spoofing-Dataset>): 360 flights (216 attacked,
 144 normal) over three missions (curved, random, straight), logged at about 125–250 Hz.
-Flights are split by flight (seed 42): 252 train, 54 validation, 54 test. The dataset is
-not redistributed in this repository.
+Flights are split by flight (seed 42): 252 train, 54 validation, 54 test; a synthetic
+attack always stays in the split of the flight it was made from.
 
-## What the pipeline does
+The dataset is **not redistributed** here: its repository has no licence, and the
+author's permission covers non-commercial academic use. `make download` fetches the
+author's own archive and checks its SHA-256. Details: [data card](docs/datasets/data_card.md);
+the detectors' intended use and limits: [model card](docs/MODEL_CARD.md).
 
-| Module | Purpose |
-|---|---|
-| 03 | Base data: aligned sensors, measured attack phases (normal / pre / ramp / plateau / post), 36 residual features |
-| 04 | Synthetic attacks: five families (abrupt jump, constant offset, linear drift, exponential ramp, low-amplitude wander), each as position-only and velocity-consistent, plus a 7-speed drift sweep (0.05–5 m/s) on the test flights |
-| 05 | Classical models: logistic regression, Naive Bayes, KNN, decision tree, random forest, isolation forest, scored as event detection with a per-flight latch |
-| 06 | Kalman filter with a chi-square (NIS) test and CUSUM |
-| 07 | LSTM autoencoder and supervised LSTM |
-| 08 | Black-box adaptive attacker (hill climber constrained on the measured mean drift speed) |
-| 09 | Consistency detector (GPS velocity vs IMU, course vs heading) |
-| 10 | Fused detector, cross-validated false alarms, threat-model table |
-| Evaluation | One metrics module and protocol set for every detector: seen missions, unseen missions, unseen attack types, cross-validated false alarms, 5 seeds, ablations |
-| Stealth | Stealth Frontier, adaptive (black-box) and white-box attacks on every detector, adversarial hardening |
-| Explain | Three reasons and a plain-language operator message for every alarm (SHAP, reconstruction error, occlusion, filter terms), K-Means of alarms |
+## Headline results
 
-Every alarm rate in the project uses the same budget: **1 false alarm per flight-hour**,
-with time taken from the log timestamps, a 10 s refractory period, and a Poisson 95%
-upper bound reported with the count and hours.
+All numbers are on held-out test flights. Full tables: `reports/tables/`.
 
-## Results so far
+| Detector | Real attacks caught | Time to alarm | Velocity-consistent synthetic caught | False alarms / h (seen) | False alarms / h (unseen mission) | Adaptive attacker at 0.5 m/s: caught, drone moved |
+|---|---|---|---|---|---|---|
+| Kalman chi-square | 100% | 0.4 s | 60% | 3.2 | 1.8 | 10%, 42 m |
+| Velocity check | 97% | 0.2 s | 24% | 1.3 | 1.7 | 0%, 43 m |
+| Fused (Kalman + velocity) | 100% | 0.2 s | 58% | 1.3 | 1.7 | 5%, 44 m |
+| Random forest | 100% | 1.6 s | 91% | 0.8 | **22.0** | **95%, 5 m** |
+| LSTM autoencoder | 100% | 2.7 s | 72% | 1.3 | 3.5 | 5%, 43 m |
+| Supervised LSTM | 100% | 2.6 s | 79% | 1.1 | 8.8 | 34%, 37 m |
 
-All numbers are on held-out test flights; the full tables are in `reports/tables/`.
+"Seen" false alarms rest on 0.75 h of normal test flight (wide bounds); cross-validated
+over all 144 normal flights (5.25 h) every detector stays at 0–1.33 per hour. Learned
+models are the mean of 5 seeds.
 
-**Real attacks (the dataset's own spoofing).** Every detector except the decision tree
-and isolation forest catches 97–100% of real attacked flights. The physics detectors
-react fastest: the velocity channel and the fused detector in about 0.2 s, the
-chi-square test in about 0.4 s; the classical models in about 1.5 s.
+![Stealth Frontier](reports/figures/stealth/D1_stealth_frontier.png)
 
-**Unseen missions (train on two missions, test on the third).** This is the hardest
-and most honest test. Real attacks are still all caught, but the learned models break
-the false-alarm budget: logistic regression 28.8/h, random forest 22.0/h, supervised
-LSTM 8.8/h, against 1.7–1.8/h for the Kalman and fused detectors. Almost all of the
-excess comes from the random mission, which flies very differently from the other two.
+*The Stealth Frontier: median metres the drone is moved before the first alarm, against
+the attacker's mean drift speed, for a fixed drift, the adaptive attacker and the
+white-box attacker (the dashed line is the whole drift: never caught).*
 
-**Window length matters.** Shortening the classical models' window from 5 s to 2 s cuts
-unseen-mission false alarms sharply (random forest 22 → 0.84/h, logistic regression
-29 → 6.7/h) while still catching every real attack; 10 s windows make it worse
-(66–69/h). Removing the barometer features changes little.
+What the results say:
 
-**Cross-validated false alarms (all 144 normal flights).** Every detector stays within
-0–1.33 alarms per flight-hour; the fused detector's 95% upper bound is 2.50/h.
-
-**Stealth Frontier (our own metric): how far can an attacker move the drone before
-the first alarm?** Attacks are smooth, velocity-consistent drifts at 0.05–5 m/s,
-from three attackers: a fixed drift, a black-box adaptive attacker that reshapes the
-drift using only alarms (practises on validation flights, tested on 21 unseen test
-flights), and a white-box attacker that knows the detector, its threshold and the
-flight. Figures in `reports/figures/stealth/`, tables `reports/tables/D_*.csv`.
-
-- The adaptive and white-box attackers beat every physics detector at every speed:
-  the drone is moved up to several hundred metres without an alarm (the white-box
-  attacker hides a ~6 m/s drift from the Kalman test, ~510 m).
-- The random forest, on missions it was trained on, catches 70% of adaptive attacks
-  at 0.25 m/s and 95–100% from 0.5 m/s, with the drone moved no more than about
-  10 m; even the white-box attacker is caught on 81–90% of flights from 1 m/s. The
-  cue is measurable: a drift shifts the GPS course away from the vehicle heading, and
-  5 s window statistics pick it up where single-sample checks cannot.
-- Adversarial hardening (retraining on the attacker's best flights, recalibrated at
-  the same budget) leaves the random forest unchanged and halves the distance an
-  adaptive attacker gets past the supervised LSTM (32–38 m to 16–22 m), at the cost of
-  more false alarms on the test flights (1.1 to 2.9 per hour, on 45 minutes of flight).
-- Trade-off: the learned models' advantage holds on seen missions only; on an unseen
-  mission their false alarms break the budget (see above).
-
-**Explaining alarms.** Every alarm (6,785 on the test flights, all detectors) comes
-with its top three reasons and a plain-language message built from a template, for
-example: *"GPS SPOOFING ALARM at 5.1 s (Kalman filter chi-square test). 1) GPS position
-jumped away from where the navigation filter predicted: 2.63 m (normal up to 0.45 m,
-6x normal) ... Still consistent: heading vs course, climb rate, barometer altitude."*
-SHAP shows the tree models rely most on horizontal-speed consistency. Clustering the
-alarms does not recover the attack families (adjusted Rand index 0.09): at the moment
-of the first alarm, different attacks show the same evidence; only abrupt jumps stand
-apart.
-
-## Limitations
-
-- The synthetic attacks are added to recorded logs (open loop). A real spoofed drone
-  would react in closed loop, so results on synthetic drifts may not carry over.
-- Simulation only; no real-flight validation.
-- Before the cross-validated stage, false-alarm rates rest on about 45 minutes of
-  normal test flight, so their confidence bounds are wide.
+- **Real attacks are easy.** The detectors above catch 97–100% of the dataset's own
+  spoofing; the physics detectors fire within about 0.2–0.4 s, while the drone has
+  moved under 1 m. (The decision tree and isolation forest do not: see the tables.)
+- **Careful attackers beat the physics detectors.** A smooth drift that also fakes the
+  GPS velocity, reshaped by an adaptive or white-box attacker, moves the drone
+  hundreds of metres past every physics detector (the white-box attacker hides about
+  6 m/s from the Kalman test, about 510 m).
+- **Window statistics see what single samples cannot.** The random forest catches
+  95–100% of adaptive attacks from 0.5 m/s with the drone moved about 5–10 m, because
+  a drift turns the GPS course away from where the drone points, and 5 s window
+  statistics pick that up. **But only on missions it was trained on:** on an unseen
+  mission its false alarms rise to 22 per hour. Shorter (2 s) windows bring that down
+  to 0.84 per hour.
+- **Explaining alarms:** all 6,785 test-flight alarms get three reasons and a message,
+  e.g. *"GPS SPOOFING ALARM at 5.1 s (Kalman filter chi-square test). 1) GPS position
+  jumped away from where the navigation filter predicted: 2.63 m (normal up to
+  0.45 m, 6x normal) ..."*.
+- **On a small computer:** the LSTMs shrink 2.5x with int8 (82 to 33 KB, 38 to 13 KB)
+  and catch the same attacks; every learned model scores a window in about 0.05–0.11 ms
+  on one CPU thread in ONNX. The physics detectors, rewritten to run one log row at a
+  time, give identical alarms and use under 0.2% of one core. The random forest is
+  16 MB (int8 does not apply to trees); a 20-tree forest is 100 KB and still catches
+  every real attack.
+- **After the alarm:** dead reckoning (IMU + barometer) stays within 10 m of the truth
+  for a median 20 s (at least 14 s in 9 of 10 runs) and within 25 m for 30 s. Against
+  the real attacks it beats trusting the spoofed GPS for about 16 s: enough to start a
+  return or landing, not to finish the mission.
 
 ## Running it
 
-Windows, Python 3.11, from the repository root:
+Windows, Python 3.11, from the repository folder (PowerShell):
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 pip install -e .
+.\make.ps1 smoke      # tests, every results table and the Stealth Frontier figure
 ```
 
-The pipeline steps run in order (each reads the previous step's output), for example:
+`smoke` works on a fresh clone without the dataset: it rebuilds the tables and the
+headline figure from the per-flight results committed in `data/processed/`. On Linux or
+macOS, `make <target>` runs the same targets.
 
-```powershell
-python src\aerovigil\attacks\generate_v2.py
-python src\aerovigil\baselines\build_window_tables_v2.py --sources orig,syn
-python src\aerovigil\baselines\rescore_v2.py
-python src\aerovigil\kalman\run_filter.py
-python src\aerovigil\fusion\signals.py
-python src\aerovigil\fusion\fuse.py
-python src\aerovigil\evaluation\run_all.py      # rebuilds every results table
-```
+| Target | What it does | Time |
+|---|---|---|
+| `download` | fetch and check the dataset (2.6 GB) | ~5 min |
+| `data` | base tables, features, splits, synthetic attacks, windows (M3–M4) | ~1 h |
+| `train` | every detector trained and calibrated (M5–M10) | ~1 h |
+| `eval` | protocols, Stealth Frontier, explanations, edge, fallback, all tables | ~15 h |
+| `tables` | rebuild every results table from saved results | ~1 min |
+| `figures` | redraw the Stealth Frontier and fallback figures | ~1 min |
+| `test` | black, ruff, pytest | ~6 min |
+| `demo` | open the offline dashboard (builds its data the first time, ~7 min) | |
 
-Checks:
+Training runs are tracked with MLflow in `mlflow.db`:
+`python -m mlflow ui --backend-store-uri sqlite:///mlflow.db`.
 
-```powershell
-python -m black --line-length 88 src\aerovigil tests
-python -m ruff check src\aerovigil tests
-python -m pytest tests -q
-```
+## Limitations
 
-## Technology
+- **Simulation only.** No result has been validated on a real drone or a real GNSS
+  signal.
+- **Open-loop synthetic attacks.** Synthetic drifts are added to recorded logs; a real
+  spoofed drone would react to the false position, which may change what detectors see.
+- **The learned models' advantage holds on seen missions only.** On an unseen mission
+  their false alarms break the budget.
+- **What nothing here stops:** a smooth, velocity-consistent drift below about 0.5 m/s
+  against the physics detectors, and the adaptive or white-box attacker against them at
+  any speed. Doing better needs extra sensing (a second GNSS antenna, an airspeed
+  sensor or a downward camera).
+- **Small false-alarm samples.** Seen-protocol rates rest on 45 minutes of normal test
+  flight; the cross-validated rates (5.25 h) are the ones to quote.
+- **Dead reckoning only buys time.** It drifts past 25 m within about 30 s.
 
-Python 3.11, NumPy, pandas, scikit-learn, PyTorch, SHAP, Matplotlib, PyArrow, pytest.
+## Ethics
+
+The project studies attacks in order to defend against them, and keeps to that:
+
+- Everything runs on recorded simulation logs. No code here generates, transmits or
+  replays a GNSS signal, and nothing interacts with a real receiver or aircraft.
+- The adaptive and white-box attackers only reshape a position offset added to a log
+  file; they are tools for measuring detectors, published with the defences they test.
+- The dataset is used under its author's permission for non-commercial academic
+  research and is not redistributed.
+- Results are reported with their limits: no claim of state-of-the-art performance and
+  no claim of real-world validation.
 
 ## Project structure
 
+- `app/` offline demo dashboard
 - `configs/` configuration files
-- `data/` dataset and intermediate results (large files are not committed)
-- `docs/` technical notes per module
+- `data/` dataset and intermediate results (the dataset and large files are not
+  committed)
+- `docs/` data card, model card, technical notes per module
 - `reports/` result tables and figures
 - `src/aerovigil/` source code, one package per module
-- `tests/` automated tests
+- `tests/` automated tests (tests that need the dataset skip without it)
+- `Makefile`, `make.ps1` one-command targets
+
+## Technology
+
+Python 3.11, NumPy, pandas, scikit-learn, PyTorch, ONNX Runtime, SHAP, Streamlit,
+Altair, Matplotlib, MLflow, PyArrow, pytest.

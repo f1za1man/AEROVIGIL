@@ -58,6 +58,7 @@ from aerovigil.lstm.train_v2 import (
     THREADS,
     load,
 )
+from aerovigil.tracking import log_run
 from aerovigil.windowing.make_windows_v2 import STEP_S
 
 SEEDS = (42, 43, 44, 45, 46)
@@ -180,6 +181,10 @@ def train_one(job, x, meta, fold_of, wdir, sdir):
         tmp = path.with_name(path.stem + ".partial" + path.suffix)
         save(tmp)
         os.replace(tmp, path)
+    log_run("aerovigil-m7-lstm", job["name"], {**job, **params},
+            {"best_epoch": hist["best_epoch"], "best_val_loss": hist["best_val"],
+             "n_train": int(tr.sum()), "n_val": int(va.sum())},
+            {"source": "run", "step": "C"})  # fmt: skip
     return {**job, "n_train": int(tr.sum()), "n_val": int(va.sum()),
             "best_epoch": hist["best_epoch"], "best_val": hist["best_val"]}  # fmt: skip
 

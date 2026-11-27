@@ -1,131 +1,121 @@
 # AEROVIGIL - Dataset Data Card
 
-## 1. Dataset Identification
+## 1. Dataset identification
 
-**Dataset Name:** UAV GPS-Spoofing Dataset (PX4 Simulation)
-**Project:** AEROVIGIL
-**Dataset Type:** Simulated UAV flight telemetry
-**Author:** Anthony Finn
-**Primary Source:**
-https://github.com/anthony-finn/UAV-GPS-Spoofing-Dataset
-**Original Simulation Environment:** PX4 SITL and Gazebo Classic (collected in 2023, quadcopter)
-**Archive used:** PX4_Simulation_Data.zip (SHA-256: 9E932C713AB2A880C167E6C9073CACB1B6C99561896B7C331E9AE3D98F8B668C)
-
-## 2. Dataset Description
-
-The dataset contains simulated UAV flight measurements collected using a quadcopter in a PX4 SITL and Gazebo Classic environment.
-
-It includes normal and GPS-spoofed flight scenarios. The attack modifies the reported GPS position incrementally, so the reported position drifts away from the actual simulated position.
-
-## 3. Available Sensor Categories
-
-- Global Positioning System (GPS)
-- Inertial Measurement Unit (IMU)
-- Barometer
-- Magnetometer
-- Ground-truth flight measurements (Raw version only)
-- Raw GPS measurements (Raw version only)
-
-## 4. Flight Scenarios
-
-The dataset contains three flight-plan categories:
-
-- Straight
-- Curved
-- Random
-
-Each category includes normal and attacked flight scenarios.
-
-## 5. Sampling Frequency
-
-Measured on the merged files (Modules 02-03). The nominal 250 Hz is not uniform:
-
-- 298 flights run at about 250 Hz and 62 flights at about 125 Hz.
-- Spacing is irregular inside flights.
-- 83 flights contain 92 dropouts of about 16 s.
-- 140,137 rows are stored out of time order. Module 03 sorts them; no rows are removed.
-
-## 6. Data Labelling
-
-`attack_enabled` (copied to `attack_label`) is 0 for normal operation and 1 while the attack is active.
-
-Verified distribution over all rows:
-
-- 0.0: 3,590,904 rows
-- 1.0: 4,302,145 rows
-
-144 flights contain no attack. 216 flights contain both 0 and 1, because the attack starts after take-off. Row labels are never inferred from the folder name.
-
-## 7. Dataset Versions
-
-The dataset provides:
-
-- Raw data: individual sensor streams, including ground truth and raw GPS measurements. These streams are not guaranteed to be synchronized.
-- Merged data: time-synchronized sensor measurements.
-- Preprocessed data: data containing derived features used in the original research.
-
-AEROVIGIL retains the raw data and uses the merged data for inspection and modelling.
-
-## 8. Permission and Usage
-
-The dataset author gave permission for non-commercial academic research use.
-
-- Permission given: requested via LinkedIn, awaiting reply
-- The author's reply is retained locally as project documentation and is not published in the repository.
-- The original dataset is not redistributed through the AEROVIGIL GitHub repository.
-
-## 9. Data Integrity
-
-- Original downloaded files remain unchanged.
-- Raw data is excluded from GitHub.
-- Data processing is performed using reproducible Python scripts.
-- Dataset inspection results are generated programmatically.
-- Flight identifiers distinguish individual missions. Format: `<mission>__<Attacked|Normal>__<log name>`.
-- The first build of the combined table had a defective `flight_id` column. It was repaired and the repair verified with `verify_flight_ids.py` (360 flights, 7,893,049 rows, per-flight row counts match the manifest).
-
-## 10. Limitations
-
-- The dataset is based on simulation rather than real-world drone recordings.
-- Raw sensor streams are not guaranteed to be time-synchronized.
-- The available flight scenarios may not represent every real UAV mission.
-- The dataset does not provide real-world radio-frequency GPS signal measurements.
-- The merged files hold `pressure_altitude` only (no absolute pressure or temperature).
-- The IMU frame, magnetometer axes and units, and attitude convention are not documented in the merged files. Checked on one flight: the magnetic field magnitude is 0.48, so the unit is gauss (the README says Tesla); angular velocity is consistent with rad/s (the README says degrees/s) but not proven; quaternions are unit-norm.
-- Sampling is non-uniform (see section 5) and straight flights are short, so they make up only about 10% of the rows.
-
-## 11. AEROVIGIL Usage
-
-The dataset is used for:
-
-- UAV telemetry analysis.
-- GPS spoofing detection.
-- Sensor consistency analysis.
-- Machine learning experiments.
-- Adaptive attack evaluation.
-- Detection performance measurement.
-- Ground-truth-based evaluation of GPS position deviation.
-
-## 12. References
-
-Dataset repository:
-https://github.com/anthony-finn/UAV-GPS-Spoofing-Dataset
-
-Research paper:
-Detecting Stealthy GPS Spoofing Attack Against UAVs Using Onboard Sensors.
-https://par.nsf.gov/servlets/purl/10541394
-
-The original dataset and research paper are cited in the final project report.
-
-## 13. Verified Facts
-
-| Item | Result |
+| Item | Value |
 |---|---|
-| Merged files | 360 flights, 7,893,049 rows, 27 columns in the combined table (23 original + attack_label, flight_id, mission_type, timestamp) |
-| Rows per mission | curved 4,362,481; random 2,741,656; straight 788,912 |
-| Flights | 144 without attack, 216 with attack starting mid-flight |
-| Missing values / duplicate rows | 0 / 0 |
-| Sampling | 298 flights at about 250 Hz, 62 at about 125 Hz; 92 dropouts of about 16 s in 83 flights |
-| Out-of-order rows | 140,137 (sorted in Module 03) |
-| IMU convention | body_to_world, specific force, ENU (R^2 0.989, found empirically in Module 06) |
-| Raw folder inventory | 396 flight folders x 6 files (barometer, gps, raw_gps, groundtruth, imu, magnetometer) = 2,376 CSVs; 144 normal and 252 attacked folders. Headers are identical within each file type and every file has time_usec. Merged contains 360 flights (144 normal, 216 attacked): 36 attacked raw flights are not in Merged (reason under investigation). Raw adds ground truth (lat/lon rad, velocity, attitude), eph/epv, temperature and absolute_pressure |
-| Units check (magnetometer, gyro) | magnetic field magnitude 0.48 = gauss, not Tesla; angular velocity consistent with rad/s, not deg/s; quaternion norm 1.0 (one straight normal flight) |
+| Name | UAV GPS-Spoofing Dataset (PX4 Simulation) |
+| Author | Anthony Finn |
+| Source | <https://github.com/anthony-finn/UAV-GPS-Spoofing-Dataset> (the archive is linked from its README, hosted on Google Drive) |
+| Simulation | PX4 SITL and Gazebo Classic, quadcopter, collected in 2023 |
+| Archive used | `PX4_Simulation_Data.zip`, 2,577,647,220 bytes, SHA-256 `9E932C713AB2A880C167E6C9073CACB1B6C99561896B7C331E9AE3D98F8B668C` |
+| Get it | `python src\aerovigil\data\download.py` (or `make download`): downloads, checks the SHA-256, unpacks to `data/raw/uav_gps_spoofing/` |
+| Paper | Detecting Stealthy GPS Spoofing Attack Against UAVs Using Onboard Sensors, <https://par.nsf.gov/servlets/purl/10541394> |
+
+## 2. Licence and permission
+
+- The dataset repository carries **no licence file** (checked through the GitHub API on
+  27 November 2026: `"license": null`). Without a licence the default is that all
+  rights are reserved, so the data is **not redistributed** through the AEROVIGIL
+  repository; the download script fetches it from the author's own link.
+- The dataset author gave permission for non-commercial academic research use.
+- Permission given: requested via LinkedIn, awaiting reply
+- The author's reply is retained locally as project documentation and is not published
+  in the repository.
+
+## 3. What is in it
+
+Simulated flights of one quadcopter in three flight plans (straight, curved, random),
+each flown normally and under a GPS-spoofing attack that moves the reported position
+step by step away from the true one.
+
+| Version | Content | Used by AEROVIGIL |
+|---|---|---|
+| Raw | one folder per flight with six streams: `gps`, `raw_gps`, `imu`, `barometer`, `magnetometer`, `groundtruth` (not synchronised) | **yes, since Module 03 v2** |
+| Merged | streams joined on shared timestamps (keeps about 70% of rows and cuts flight ends) | inspection only (Modules 02-03 v1) |
+| Preprocessed | the authors' own derived features | no |
+
+AEROVIGIL uses **360 flights**: 144 normal and 216 attacked (the Merged set; 36 extra
+attacked Raw folders are not used). Flights per mission: curved 108, random 144,
+straight 108; rows: curved 57%, random 34%, straight 9% (straight flights are short,
+32-55 s; curved flights run 218-299 s).
+
+## 4. How AEROVIGIL builds its base table (Module 03 v2)
+
+Every stream is aligned to the `gps.csv` timeline by nearest timestamp (tolerance
+10 ms), so no GPS row is lost; exact duplicate GPS rows are dropped (median 11,088 per
+flight). One parquet file per flight in `data/processed/module03_v2/base/`.
+
+| Columns | Unit and convention |
+|---|---|
+| `latitude_deg`, `longitude_deg`, `altitude` | the GPS fix the autopilot used (spoofed during an attack); degrees, metres |
+| `velocity_east`, `velocity_north`, `velocity_up` | GPS velocity, m/s, East-North-Up |
+| `raw_latitude_deg` ... `raw_velocity_up` | `raw_gps`: the same receiver before the spoofing was applied |
+| `gt_*` | Gazebo ground truth (position, velocity, attitude) |
+| `pressure_altitude` (+ temperature, absolute pressure) | barometer, metres |
+| `linear_acceleration_x/y/z` | accelerometer, m/s^2, body frame, specific force (includes gravity) |
+| `angular_velocity_x/y/z` | gyroscope, rad/s (the dataset README says deg/s) |
+| `orientation_x/y/z/w` | attitude quaternion in that order, body-to-world, East-North-Up (verified: horizontal acceleration R^2 0.963) |
+| `magnetic_field_x/y/z` | gauss (the README says tesla), **in PX4 body axes (forward, right, down)**: flip y and z to use it with the quaternion (then the field keeps one direction to 1.7 deg and dips 63 deg, as at the simulator's location) |
+| `t_s` | seconds from the flight's first row, from the log timestamps |
+
+## 5. Sampling
+
+- Nominal 250 Hz; measured: some flights at about 250 Hz, others at about 125 Hz, on
+  average about **172 rows/s**, with irregular spacing. Never compute time from a row
+  count: use `t_s`.
+- The IMU, barometer, magnetometer and ground-truth streams **drop out** about twice per
+  flight (up to 32 s) while GPS continues: about 8% of rows. These rows are kept with
+  NaN sensors; `aligned_all == 1` marks complete rows.
+- **IMU start offset:** real logs open with about 18 dropout rows, so a calculation that
+  drops them and restarts its clock runs 0.10-0.12 s (typically 0.116 s) behind `t_s`.
+  Every detector here works on the `t_s` clock.
+
+## 6. Labels
+
+| Column | Meaning |
+|---|---|
+| `attack_enabled` / `attack_label` | the dataset's own label: 1 while the attack is switched on (kept unchanged) |
+| `offset_m` | measured horizontal distance between `gps` and `raw_gps` |
+| `spoof_truth` | 1 from the first labelled row to the last row with `offset_m` >= 1 m |
+| `phase` | 0 normal flight, 1 pre-attack, 2 ramp, 3 plateau, 4 post-attack (measured from `offset_m`) |
+| `seconds_since_onset` | seconds from the first labelled row |
+
+Real attacks start 1-26 s into the flight (median 5.4 s), ramp for about 4 s and then
+hold a plateau of **7.5-11.1 m** (median 9.8 m) until the end of the label.
+
+## 7. Split
+
+Split by flight (seed 42): **252 train, 54 validation, 54 test** flights
+(`data/interim/module03/flight_splits.csv`). Synthetic attacks (Module 04) are copies of
+normal flights with an offset added, and always stay in their source flight's split.
+For the LSTMs, every second normal training flight is held back as calibration
+(`role = calib`). `tests/evaluation/test_no_leakage.py` checks all of this on the real
+files.
+
+## 8. Known quirks and limits
+
+- Simulation only: no real radio signal, no real drone. One vehicle model.
+- The real attacks are mild (plateau about 10 m); harder attacks come from Module 04.
+- `raw_gps` (used as ground truth) sits about 2 m from `gt_*` (median; 3.6 m at the 99th
+  percentile): ordinary GPS error.
+- Multirotor attitude does not follow the direction of travel (the drone crabs), so a
+  course-against-heading check is noisy at low speed.
+- 140,137 Merged rows are out of time order (sorted, none removed); 92 dropouts of about
+  16 s in 83 Merged flights.
+- Sensor frames and units are not documented by the dataset; the conventions in
+  section 4 were measured on the data.
+
+## 9. Integrity
+
+- The downloaded files are never modified; all processing is scripted
+  (`make data`) and writes to `data/interim` and `data/processed`.
+- Flight identifiers: `<Mission>__<Attacked|Normal>__<log name>`.
+- Raw data, base tables and synthetic flights are excluded from Git; only small result
+  tables and the split file are committed.
+
+## 10. AEROVIGIL usage
+
+GPS-spoofing detection, sensor-consistency analysis, machine learning experiments,
+adaptive-attack evaluation, dead-reckoning analysis and the offline demo. The dataset
+and paper are cited in the final project report.

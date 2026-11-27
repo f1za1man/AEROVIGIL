@@ -43,6 +43,7 @@ from aerovigil.adaptive import search as m08
 from aerovigil.adaptive.profile import clip, profile_fn
 from aerovigil.baselines.build_window_tables_v2 import flight_windows
 from aerovigil.evaluation import lstm_protocols as lp
+from aerovigil.tracking import log_run
 from aerovigil.lstm.build_sequences_v2 import BASE_REPORT, SPLITS, roles_for
 from aerovigil.lstm.models import build_model, fit, predict
 from aerovigil.lstm.sequences_v2 import flight_sequences
@@ -177,6 +178,11 @@ def hardened_lstm(seed, x_e, meta_e):
          "best_epoch": hist["best_epoch"], "n_train": int(tr.sum()),
          "n_evasive_train": int((tr & (meta["attack_type"] == "evasive")
                                  .to_numpy()).sum())}, indent=2)))  # fmt: skip
+    log_run("aerovigil-m8-hardening", f"lstm_supervised hardened s{seed}",
+            {"model": "lstm_supervised", "seed": seed, **params},
+            {"threshold": thr, "calibration_hours": hours,
+             "best_epoch": hist["best_epoch"], "best_val_loss": hist["best_val"],
+             "n_train": int(tr.sum())}, {"source": "run", "step": "D"})  # fmt: skip
     torch.set_num_threads(1)
     model.eval()
     return D.LSTM("clf", model, thr, seed)

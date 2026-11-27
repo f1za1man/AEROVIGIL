@@ -200,13 +200,11 @@ def false_alarm_rows(flights):
 
 def finish(flights, started):
     D.OUT.mkdir(parents=True, exist_ok=True)
-    D.atomic_write(D.OUT / "fixed_flights.csv",
-                   lambda p: flights.to_csv(p, index=False))  # fmt: skip
+    D.save_csv(flights, D.OUT / "fixed_flights.csv")
     check = selftest(flights)
-    check.to_csv(D.OUT / "fixed_selftest.csv", index=False)
+    D.save_csv(check, D.OUT / "fixed_selftest.csv")
     table = frontier(flights)
-    TABLE.parent.mkdir(parents=True, exist_ok=True)
-    table.to_csv(TABLE, index=False)
+    D.save_csv(table, TABLE)
     pd.set_option("display.width", 220)
     print(
         "\nSELF-TEST against Step C's own per-flight verdicts (attacked test flights)"

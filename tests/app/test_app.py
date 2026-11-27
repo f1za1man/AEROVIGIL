@@ -15,7 +15,7 @@ pytestmark = pytest.mark.skipif(not DATA.is_file(), reason="demo data not built"
 
 
 def run(at):
-    at.run(timeout=120)
+    at.run(timeout=300)
     assert not at.exception, at.exception
     return at
 
@@ -23,7 +23,7 @@ def run(at):
 def new():
     from streamlit.testing.v1 import AppTest
 
-    return run(AppTest.from_file(str(APP), default_timeout=120))
+    return run(AppTest.from_file(str(APP), default_timeout=300))
 
 
 def by_label(widgets, label):

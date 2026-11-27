@@ -126,6 +126,8 @@ switch ($Target) {
     "figures" { Invoke-Figures }
     "test" { Invoke-Test }
     "smoke" {
+        # a fresh clone has no dataset: data tests skip instead of failing
+        $env:AEROVIGIL_ALLOW_MISSING_DATA = "1"
         $t = Get-Date
         Invoke-Test
         Invoke-Tables

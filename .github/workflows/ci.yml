@@ -22,7 +22,9 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install torch==2.15.0 --index-url https://download.pytorch.org/whl/cpu
-          pip install -r requirements.txt
+          pip install -r requirements.txt -r requirements-dev.txt
           pip install -e .
       - name: Smoke run
+        env:
+          AEROVIGIL_ALLOW_MISSING_DATA: "1"
         run: make smoke

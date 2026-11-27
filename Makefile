@@ -77,6 +77,8 @@ test:
 	$(PY) -m ruff check src/aerovigil tests app
 	$(PY) -m pytest tests -q
 
+# a fresh clone has no dataset: data tests skip instead of failing
+smoke: export AEROVIGIL_ALLOW_MISSING_DATA = 1
 smoke: test tables
 	$(PY) src/aerovigil/stealth/figures.py
 

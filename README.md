@@ -134,7 +134,7 @@ Windows, Python 3.11, from the repository folder (PowerShell):
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+pip install -r requirements.txt -r requirements-dev.txt
 pip install -e .
 .\make.ps1 smoke      # tests, every results table and the Stealth Frontier figure
 ```

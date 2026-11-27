@@ -19,6 +19,8 @@ always match the data behind them. The heavy runs that produce those results are
                                                                 its F_*.csv tables are
                                                                 timings, so it writes
                                                                 them itself)
+    python src\aerovigil\mitigation\run.py                     (Step G, ~7 min;
+                                                                --figures redraws)
 
 Tables written to reports/tables/
     A_old_vs_new.csv           results before and after the Module 04 regeneration
@@ -37,6 +39,8 @@ Tables written to reports/tables/
     E_*.csv                    alarm reasons, example messages, SHAP, K-Means
     reports/figures/explain/   E1-E2 figures
     F_*.csv                    edge benchmark: size, one-thread latency, int8, streaming
+    G_*.csv                    dead-reckoning fallback after an alarm (and G1-G2 figures
+                               in reports/figures/mitigation/)
 
 Usage:
     python src\aerovigil\evaluation\run_all.py

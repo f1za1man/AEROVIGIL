@@ -1,0 +1,9 @@
+what,option,runs,criterion,value,chosen
+variant,hold,217,median error 30 s into the coast (m),90.74725065237692,False
+variant,imu,217,median error 30 s into the coast (m),24.69565385092158,True
+variant,mag,217,median error 30 s into the coast (m),24.74316840913975,False
+rollback_s,0.0,33,median of the mean error over the first 30 s after the alarm (m),6.209463302555083,True
+rollback_s,1.0,33,median of the mean error over the first 30 s after the alarm (m),9.654131265271607,False
+rollback_s,2.0,33,median of the mean error over the first 30 s after the alarm (m),9.629002057913722,False
+rollback_s,5.0,33,median of the mean error over the first 30 s after the alarm (m),14.03405181427854,False
+rollback_s,10.0,33,median of the mean error over the first 30 s after the alarm (m),12.843489940885757,False

@@ -56,6 +56,7 @@ import pandas as pd
 import aerovigil.baselines.all_models_v2 as am
 from aerovigil.evaluation import ablations, compare_runs, lstm_protocols
 from aerovigil.evaluation import physics_protocols as phys
+from aerovigil.evaluation import store
 
 ROOT = Path(__file__).resolve().parents[3]
 TABLES = ROOT / "reports" / "tables"
@@ -74,10 +75,10 @@ COLUMNS = ["protocol", "detector", "family", "seeds", "detected", "detected_spre
 
 
 def read(path):
-    if not path.is_file():
+    frame = store.read_csv(path)
+    if frame is None:
         print(f"  missing {path.relative_to(ROOT)}: run its module first")
-        return None
-    return pd.read_csv(path)
+    return frame
 
 
 def classical(full):
@@ -147,8 +148,9 @@ def explain():
     from aerovigil.explain import reasons
     from aerovigil.explain import run as explain_run
 
-    if (reasons.OUT / "alarms.csv").is_file():
-        explain_run.summarise(with_shap=False)  # SHAP table is reused, not recomputed
+    alarms = store.read_csv(reasons.OUT / "alarms.csv")
+    if alarms is not None:  # the SHAP table is reused, not recomputed
+        explain_run.summarise(alarms, with_shap=False)
 
 
 def combine(cls, phy, lst):
@@ -195,12 +197,16 @@ def run():
     print("=" * 78)
     print("AEROVIGIL - REBUILD EVERY TABLE FROM SAVED RESULTS")
     print("=" * 78)
+    for gz in store.publish():  # the committed copies of the large per-flight files
+        print(f"  refreshed {gz.relative_to(ROOT)}")
     compare_runs.run()
     classical(full=False)
     cls, phy, lst = classical(full=True), physics(), lstm()
     ablation()
     combined = combine(cls, phy, lst)
-    if combined is not None:
+    if combined is not None and any(x is None for x in (cls, phy, lst)):
+        print("  C_all_detectors.csv kept as it is: some of its results are missing")
+    elif combined is not None:
         combined.to_csv(TABLES / "C_all_detectors.csv", index=False)
         pd.set_option("display.width", 250)
         print("\nEVERY DETECTOR (unseen missions first)")

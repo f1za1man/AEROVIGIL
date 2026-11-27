@@ -23,10 +23,16 @@ download:
 data: download
 	$(PY) src/aerovigil/data/inspect_raw_files.py
 	$(PY) -m aerovigil.data.inspect_dataset
+	$(PY) src/aerovigil/preprocessing/clean_flights.py
+	$(PY) src/aerovigil/preprocessing/split_flights.py
+	$(PY) src/aerovigil/data/check_raw_coverage.py
+	$(PY) src/aerovigil/data/check_attack_end.py
 	$(PY) src/aerovigil/data/build_raw_base.py
+	$(PY) src/aerovigil/data/check_base_quality.py
 	$(PY) -m aerovigil.features.build_features_v2
 	$(PY) -m aerovigil.preprocessing.normalize_features_v2
 	$(PY) -m aerovigil.windowing.make_windows_v2
+	$(PY) src/aerovigil/windowing/window_separability.py
 	$(PY) src/aerovigil/attacks/generate_v2.py
 	$(PY) src/aerovigil/attacks/features_v2_m04.py
 	$(PY) src/aerovigil/attacks/attack_separability.py
@@ -34,9 +40,12 @@ data: download
 	$(PY) src/aerovigil/lstm/build_sequences_v2.py
 
 train:
+	$(PY) src/aerovigil/kalman/calibrate_imu.py
+	$(PY) src/aerovigil/kalman/tune_noise.py
 	$(PY) src/aerovigil/baselines/rescore_v2.py
 	$(PY) src/aerovigil/kalman/run_filter.py
 	$(PY) src/aerovigil/kalman/evaluate_detectors.py
+	$(PY) src/aerovigil/adaptive/search.py
 	$(PY) src/aerovigil/lstm/train_v2.py
 	$(PY) src/aerovigil/lstm/evaluate_v2.py
 	$(PY) src/aerovigil/lstm/sequential_v2.py

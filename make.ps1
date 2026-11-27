@@ -40,10 +40,16 @@ function Invoke-Data {
     Invoke-Download
     Invoke-Py "src\aerovigil\data\inspect_raw_files.py"
     Invoke-Py -m aerovigil.data.inspect_dataset
+    Invoke-Py "src\aerovigil\preprocessing\clean_flights.py"
+    Invoke-Py "src\aerovigil\preprocessing\split_flights.py"
+    Invoke-Py "src\aerovigil\data\check_raw_coverage.py"
+    Invoke-Py "src\aerovigil\data\check_attack_end.py"
     Invoke-Py "src\aerovigil\data\build_raw_base.py"
+    Invoke-Py "src\aerovigil\data\check_base_quality.py"
     Invoke-Py -m aerovigil.features.build_features_v2
     Invoke-Py -m aerovigil.preprocessing.normalize_features_v2
     Invoke-Py -m aerovigil.windowing.make_windows_v2
+    Invoke-Py "src\aerovigil\windowing\window_separability.py"
     Invoke-Py "src\aerovigil\attacks\generate_v2.py"
     Invoke-Py "src\aerovigil\attacks\features_v2_m04.py"
     Invoke-Py "src\aerovigil\attacks\attack_separability.py"
@@ -52,7 +58,8 @@ function Invoke-Data {
 }
 
 function Invoke-Train {
-    foreach ($s in "baselines\rescore_v2", "kalman\run_filter", "kalman\evaluate_detectors",
+    foreach ($s in "kalman\calibrate_imu", "kalman\tune_noise", "baselines\rescore_v2",
+                   "kalman\run_filter", "kalman\evaluate_detectors", "adaptive\search",
                    "lstm\train_v2", "lstm\evaluate_v2", "lstm\sequential_v2",
                    "consistency\evaluate", "fusion\signals", "fusion\fuse",
                    "fusion\adaptive", "fusion\threat_model") {

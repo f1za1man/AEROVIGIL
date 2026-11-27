@@ -35,6 +35,7 @@ not redistributed in this repository.
 | 10 | Fused detector, cross-validated false alarms, threat-model table |
 | Evaluation | One metrics module and protocol set for every detector: seen missions, unseen missions, unseen attack types, cross-validated false alarms, 5 seeds, ablations |
 | Stealth | Stealth Frontier, adaptive (black-box) and white-box attacks on every detector, adversarial hardening |
+| Explain | Three reasons and a plain-language operator message for every alarm (SHAP, reconstruction error, occlusion, filter terms), K-Means of alarms |
 
 Every alarm rate in the project uses the same budget: **1 false alarm per flight-hour**,
 with time taken from the log timestamps, a 10 s refractory period, and a Poisson 95%
@@ -85,6 +86,16 @@ flight. Figures in `reports/figures/stealth/`, tables `reports/tables/D_*.csv`.
 - Trade-off: the learned models' advantage holds on seen missions only; on an unseen
   mission their false alarms break the budget (see above).
 
+**Explaining alarms.** Every alarm (6,785 on the test flights, all detectors) comes
+with its top three reasons and a plain-language message built from a template, for
+example: *"GPS SPOOFING ALARM at 5.1 s (Kalman filter chi-square test). 1) GPS position
+jumped away from where the navigation filter predicted: 2.63 m (normal up to 0.45 m,
+6x normal) ... Still consistent: heading vs course, climb rate, barometer altitude."*
+SHAP shows the tree models rely most on horizontal-speed consistency. Clustering the
+alarms does not recover the attack families (adjusted Rand index 0.09): at the moment
+of the first alarm, different attacks show the same evidence; only abrupt jumps stand
+apart.
+
 ## Limitations
 
 - The synthetic attacks are added to recorded logs (open loop). A real spoofed drone
@@ -126,7 +137,7 @@ python -m pytest tests -q
 
 ## Technology
 
-Python 3.11, NumPy, pandas, scikit-learn, PyTorch, Matplotlib, PyArrow, pytest.
+Python 3.11, NumPy, pandas, scikit-learn, PyTorch, SHAP, Matplotlib, PyArrow, pytest.
 
 ## Project structure
 

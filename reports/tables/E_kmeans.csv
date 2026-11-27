@@ -1,0 +1,7 @@
+description,k,silhouette,ari_vs_family,alarms,chosen_by
+"random forest, check ratios",3,0.3287402243713534,0.08564256280306821,223,silhouette
+"random forest, check ratios",6,0.16395976346686988,0.08767804001438508,223,families
+"random forest, SHAP shares",6,,0.1610031851738754,223,families
+"Kalman, check ratios",6,,0.13175649323057373,200,families
+"fused, check ratios",6,,0.05558010810271268,199,families
+"supervised LSTM, check ratios",6,,0.13473298103299367,199,families

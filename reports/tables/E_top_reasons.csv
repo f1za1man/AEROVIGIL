@@ -1,0 +1,149 @@
+detector,family,reason1,share,alarms
+consistency,abrupt_jump,horizontal_velocity,0.575,40
+consistency,abrupt_jump,kf_altitude,0.175,40
+consistency,abrupt_jump,kf_velocity,0.15,40
+consistency,abrupt_jump,accel_horizontal,0.05,40
+consistency,abrupt_jump,accel_vertical,0.025,40
+consistency,abrupt_jump,vertical_velocity,0.025,40
+consistency,constant_offset,horizontal_velocity,0.5,26
+consistency,constant_offset,kf_position,0.4230769230769231,26
+consistency,constant_offset,course,0.07692307692307693,26
+consistency,exponential_ramp,horizontal_velocity,1.0,21
+consistency,linear_drift,horizontal_velocity,0.9411764705882353,17
+consistency,linear_drift,kf_position,0.058823529411764705,17
+consistency,low_amplitude_wander,horizontal_velocity,1.0,21
+consistency,real attack,horizontal_velocity,0.9393939393939394,33
+consistency,real attack,kf_position,0.06060606060606061,33
+cusum,abrupt_jump,kf_position,0.5,40
+cusum,abrupt_jump,kf_velocity,0.5,40
+cusum,constant_offset,kf_position,0.7333333333333333,30
+cusum,constant_offset,kf_velocity,0.26666666666666666,30
+cusum,drift sweep,kf_position,0.7,20
+cusum,drift sweep,course,0.15,20
+cusum,drift sweep,kf_velocity,0.1,20
+cusum,drift sweep,kf_altitude,0.05,20
+cusum,exponential_ramp,kf_position,1.0,23
+cusum,linear_drift,kf_position,1.0,22
+cusum,low_amplitude_wander,kf_position,1.0,19
+cusum,real attack,kf_position,1.0,33
+fused,abrupt_jump,kf_velocity,0.5476190476190477,42
+fused,abrupt_jump,horizontal_velocity,0.19047619047619047,42
+fused,abrupt_jump,kf_altitude,0.16666666666666666,42
+fused,abrupt_jump,accel_horizontal,0.047619047619047616,42
+fused,abrupt_jump,accel_vertical,0.023809523809523808,42
+fused,abrupt_jump,vertical_velocity,0.023809523809523808,42
+fused,constant_offset,kf_velocity,0.5,42
+fused,constant_offset,kf_position,0.42857142857142855,42
+fused,constant_offset,horizontal_velocity,0.07142857142857142,42
+fused,drift sweep,kf_velocity,1.0,67
+fused,exponential_ramp,horizontal_velocity,0.7916666666666666,24
+fused,exponential_ramp,kf_velocity,0.125,24
+fused,exponential_ramp,kf_position,0.08333333333333333,24
+fused,linear_drift,horizontal_velocity,0.5517241379310345,29
+fused,linear_drift,kf_velocity,0.27586206896551724,29
+fused,linear_drift,kf_position,0.13793103448275862,29
+fused,linear_drift,kf_altitude,0.034482758620689655,29
+fused,low_amplitude_wander,horizontal_velocity,0.7241379310344828,29
+fused,low_amplitude_wander,kf_velocity,0.27586206896551724,29
+fused,real attack,horizontal_velocity,0.7575757575757576,33
+fused,real attack,kf_position,0.21212121212121213,33
+fused,real attack,course,0.030303030303030304,33
+kalman,abrupt_jump,kf_position,0.5,40
+kalman,abrupt_jump,kf_velocity,0.5,40
+kalman,constant_offset,kf_position,0.5,42
+kalman,constant_offset,kf_velocity,0.5,42
+kalman,drift sweep,kf_velocity,0.9436619718309859,71
+kalman,drift sweep,kf_position,0.056338028169014086,71
+kalman,exponential_ramp,kf_position,0.84,25
+kalman,exponential_ramp,kf_velocity,0.16,25
+kalman,linear_drift,kf_position,0.6333333333333333,30
+kalman,linear_drift,kf_velocity,0.3,30
+kalman,linear_drift,kf_altitude,0.06666666666666667,30
+kalman,low_amplitude_wander,kf_position,0.7333333333333333,30
+kalman,low_amplitude_wander,kf_velocity,0.26666666666666666,30
+kalman,real attack,kf_position,1.0,33
+lstm_ae,abrupt_jump,horizontal_velocity,0.925,40
+lstm_ae,abrupt_jump,accel_horizontal,0.075,40
+lstm_ae,constant_offset,horizontal_velocity,0.5238095238095238,42
+lstm_ae,constant_offset,accel_horizontal,0.47619047619047616,42
+lstm_ae,drift sweep,accel_horizontal,1.0,28
+lstm_ae,exponential_ramp,horizontal_velocity,0.9130434782608695,23
+lstm_ae,exponential_ramp,accel_horizontal,0.043478260869565216,23
+lstm_ae,exponential_ramp,course,0.043478260869565216,23
+lstm_ae,linear_drift,horizontal_velocity,0.8636363636363636,22
+lstm_ae,linear_drift,accel_horizontal,0.13636363636363635,22
+lstm_ae,low_amplitude_wander,horizontal_velocity,0.875,24
+lstm_ae,low_amplitude_wander,accel_horizontal,0.125,24
+lstm_ae,real attack,horizontal_velocity,1.0,33
+lstm_supervised,abrupt_jump,horizontal_velocity,1.0,40
+lstm_supervised,constant_offset,horizontal_velocity,0.7857142857142857,42
+lstm_supervised,constant_offset,accel_horizontal,0.21428571428571427,42
+lstm_supervised,drift sweep,accel_horizontal,0.5285714285714286,70
+lstm_supervised,drift sweep,course,0.3,70
+lstm_supervised,drift sweep,gps_motion,0.07142857142857142,70
+lstm_supervised,drift sweep,horizontal_velocity,0.05714285714285714,70
+lstm_supervised,drift sweep,kf_altitude,0.04285714285714286,70
+lstm_supervised,exponential_ramp,horizontal_velocity,0.8461538461538461,26
+lstm_supervised,exponential_ramp,course,0.11538461538461539,26
+lstm_supervised,exponential_ramp,accel_horizontal,0.038461538461538464,26
+lstm_supervised,linear_drift,horizontal_velocity,0.7241379310344828,29
+lstm_supervised,linear_drift,accel_horizontal,0.10344827586206896,29
+lstm_supervised,linear_drift,course,0.10344827586206896,29
+lstm_supervised,linear_drift,gps_motion,0.06896551724137931,29
+lstm_supervised,low_amplitude_wander,horizontal_velocity,0.7586206896551724,29
+lstm_supervised,low_amplitude_wander,accel_horizontal,0.13793103448275862,29
+lstm_supervised,low_amplitude_wander,course,0.10344827586206896,29
+lstm_supervised,real attack,horizontal_velocity,1.0,33
+random_forest,abrupt_jump,horizontal_velocity,0.9047619047619048,42
+random_forest,abrupt_jump,accel_horizontal,0.09523809523809523,42
+random_forest,constant_offset,horizontal_velocity,0.6190476190476191,42
+random_forest,constant_offset,accel_horizontal,0.30952380952380953,42
+random_forest,constant_offset,vertical_velocity,0.047619047619047616,42
+random_forest,constant_offset,course,0.023809523809523808,42
+random_forest,drift sweep,accel_horizontal,0.5784313725490197,102
+random_forest,drift sweep,gps_motion,0.12745098039215685,102
+random_forest,drift sweep,course,0.10784313725490197,102
+random_forest,drift sweep,kf_altitude,0.0784313725490196,102
+random_forest,drift sweep,kf_velocity,0.0784313725490196,102
+random_forest,drift sweep,horizontal_velocity,0.0196078431372549,102
+random_forest,drift sweep,vertical_velocity,0.00980392156862745,102
+random_forest,exponential_ramp,horizontal_velocity,0.5714285714285714,35
+random_forest,exponential_ramp,gps_motion,0.11428571428571428,35
+random_forest,exponential_ramp,accel_horizontal,0.08571428571428572,35
+random_forest,exponential_ramp,course,0.08571428571428572,35
+random_forest,exponential_ramp,kf_altitude,0.08571428571428572,35
+random_forest,exponential_ramp,kf_velocity,0.02857142857142857,35
+random_forest,exponential_ramp,vertical_velocity,0.02857142857142857,35
+random_forest,linear_drift,horizontal_velocity,0.6176470588235294,34
+random_forest,linear_drift,accel_horizontal,0.14705882352941177,34
+random_forest,linear_drift,gps_motion,0.11764705882352941,34
+random_forest,linear_drift,course,0.029411764705882353,34
+random_forest,linear_drift,kf_altitude,0.029411764705882353,34
+random_forest,linear_drift,kf_velocity,0.029411764705882353,34
+random_forest,linear_drift,vertical_velocity,0.029411764705882353,34
+random_forest,low_amplitude_wander,horizontal_velocity,0.5405405405405406,37
+random_forest,low_amplitude_wander,accel_horizontal,0.2702702702702703,37
+random_forest,low_amplitude_wander,course,0.08108108108108109,37
+random_forest,low_amplitude_wander,kf_velocity,0.05405405405405406,37
+random_forest,low_amplitude_wander,gps_motion,0.02702702702702703,37
+random_forest,low_amplitude_wander,kf_altitude,0.02702702702702703,37
+random_forest,real attack,horizontal_velocity,0.9696969696969697,33
+random_forest,real attack,kf_velocity,0.030303030303030304,33
+velocity,abrupt_jump,horizontal_velocity,0.575,40
+velocity,abrupt_jump,kf_altitude,0.175,40
+velocity,abrupt_jump,kf_velocity,0.15,40
+velocity,abrupt_jump,accel_horizontal,0.05,40
+velocity,abrupt_jump,accel_vertical,0.025,40
+velocity,abrupt_jump,vertical_velocity,0.025,40
+velocity,constant_offset,kf_position,0.5925925925925926,27
+velocity,constant_offset,horizontal_velocity,0.4074074074074074,27
+velocity,exponential_ramp,horizontal_velocity,1.0,21
+velocity,linear_drift,horizontal_velocity,0.9,20
+velocity,linear_drift,kf_altitude,0.05,20
+velocity,linear_drift,kf_position,0.05,20
+velocity,low_amplitude_wander,horizontal_velocity,1.0,21
+velocity,real attack,horizontal_velocity,0.65625,32
+velocity,real attack,kf_position,0.25,32
+velocity,real attack,course,0.03125,32
+velocity,real attack,kf_altitude,0.03125,32
+velocity,real attack,kf_velocity,0.03125,32

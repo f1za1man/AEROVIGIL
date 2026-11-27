@@ -1,0 +1,11 @@
+check,unit,normal_up_to,meaning
+course,deg,21.955607610436005,GPS direction of travel disagrees with where the drone is pointing
+horizontal_velocity,m/s,0.0998374879360199,GPS position change disagrees with the GPS-reported speed
+vertical_velocity,m/s,0.01571072414517403,GPS altitude change disagrees with the reported climb rate
+altitude,m/s,0.2457275390625,GPS altitude is drifting away from the barometer
+accel_horizontal,m/s^2,0.36142704635858536,GPS speed changes do not match the accelerometer (horizontal)
+accel_vertical,m/s^2,0.12344888783991337,GPS climb-rate changes do not match the accelerometer (vertical)
+gps_motion,m/s,11.816877365112305,GPS-derived speed is unusual
+kf_position,m,0.4490088060498236,GPS position jumped away from where the navigation filter predicted
+kf_velocity,m/s,0.04429904986172914,GPS velocity disagrees with the filter's IMU-based prediction
+kf_altitude,NIS,16.873730373382564,GPS altitude and climb disagree with the barometer (vertical filter)

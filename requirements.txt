@@ -12,4 +12,4 @@ optuna==5.1.0
 pyarrow==26.0.1
 scipy==1.17.1
 seaborn==0.13.2
-torch==2.15.0
+torch==2.15.0shap==0.51.0

@@ -1,0 +1,12 @@
+{
+  "course": 21.955607610436005,
+  "horizontal_velocity": 0.0998374879360199,
+  "vertical_velocity": 0.01571072414517403,
+  "altitude": 0.2457275390625,
+  "accel_horizontal": 0.36142704635858536,
+  "accel_vertical": 0.12344888783991337,
+  "gps_motion": 11.816877365112305,
+  "kf_position": 0.4490088060498236,
+  "kf_velocity": 0.04429904986172914,
+  "kf_altitude": 16.873730373382564
+}

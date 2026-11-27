@@ -298,9 +298,12 @@ class Windowed(Detector):
 
 
 class RandomForest(Windowed):
-    def __init__(self, model, threshold, cols, seed, ctx=None, norm=None):
+    """A Module 05 tree model on the window statistics (random forest by default)."""
+
+    def __init__(self, model, threshold, cols, seed, ctx=None, norm=None,
+                 name="random_forest"):  # fmt: skip
         super().__init__(ctx, norm)
-        self.name = "random_forest"
+        self.name = name
         self.model, self.threshold, self.cols, self.seed = model, threshold, cols, seed
 
     def window_scores(self, fl):
@@ -308,7 +311,7 @@ class RandomForest(Windowed):
         if not len(w):
             return np.zeros(0), np.zeros(0)
         return w["window_end_s"].to_numpy(float), am.score(
-            "random_forest", self.model, w, self.cols
+            self.name, self.model, w, self.cols
         )
 
 
@@ -356,23 +359,26 @@ def physics_calibration():
     return cal
 
 
-def rf_seen_params():
+SHORT_NAME = {"random_forest": "rf", "decision_tree": "dt"}
+
+
+def seen_params(name="random_forest"):
     t = pd.read_csv(M05_DIR / "all_models_tuning_full.csv")
-    t = t[(t["protocol"] == "seen") & (t["model"] == "random_forest")]
+    t = t[(t["protocol"] == "seen") & (t["model"] == name)]
     return json.loads(t.loc[t["val_auc"].idxmax(), "params"])
 
 
-def rf_saved_threshold(seed):
+def saved_threshold(seed, name="random_forest"):
     w = pd.read_csv(M05_DIR / "all_models_window_full.csv")
-    w = w[(w["protocol"] == "seen") & (w["model"] == "random_forest")
-          & (w["seed"] == seed)]  # fmt: skip
+    w = w[(w["protocol"] == "seen") & (w["model"] == name) & (w["seed"] == seed)]
     return float(w["threshold"].iloc[0]) if len(w) else np.nan
 
 
-def fit_random_forest(seed, extra=None, tag="seen"):
-    """Step B/C's seen random forest at one seed; `extra` adds training windows
-    (the hardening set). Cached under data/processed/stealth/models."""
-    path = MODELS / f"rf_{tag}_s{seed}.joblib"
+def fit_classical(name, seed, extra=None, tag="seen"):
+    """Step B/C's seen tree model (random forest or decision tree) at one seed;
+    `extra` adds training windows (the hardening set). The threshold is checked
+    against Step C's. Cached under data/processed/stealth/models."""
+    path = MODELS / f"{SHORT_NAME[name]}_{tag}_s{seed}.joblib"
     if path.is_file():
         d = joblib.load(path)
         return d["model"], d["threshold"], d["cols"]
@@ -381,20 +387,23 @@ def fit_random_forest(seed, extra=None, tag="seen"):
     tr, va, clean_va, _, _ = am.protocol_sets(orig, syn, None, "seen")
     if extra is not None:
         tr = pd.concat([tr, extra], ignore_index=True)
-    params = rf_seen_params()
-    model = am.fit("random_forest", params, tr, cols, seed)
-    pool = am.clean_pool("random_forest", params, tr, clean_va, model, cols, seed)
+    params = seen_params(name)
+    model = am.fit(name, params, tr, cols, seed)
+    pool = am.clean_pool(name, params, tr, clean_va, model, cols, seed)
     thr, hours, allowed = am.threshold_for(pool)
     if tag == "seen":
-        want = rf_saved_threshold(seed)
+        want = saved_threshold(seed, name)
         if np.isfinite(want) and not np.isclose(thr, want, rtol=1e-6):
-            raise SystemExit(
-                f"RF seed {seed} threshold {thr} differs from Step C {want}"
-            )
+            raise SystemExit(f"{name} seed {seed} threshold {thr} differs from "
+                             f"Step C {want}")  # fmt: skip
     atomic_write(path, lambda p: joblib.dump({"model": model, "threshold": thr,
                                               "cols": cols, "pool_hours": hours,
                                               "allowed": allowed}, p))  # fmt: skip
     return model, thr, cols
+
+
+def fit_random_forest(seed, extra=None, tag="seen"):
+    return fit_classical("random_forest", seed, extra, tag)
 
 
 def load_lstm(kind, seed, weights=None, threshold=None):

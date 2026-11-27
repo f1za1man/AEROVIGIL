@@ -14,6 +14,7 @@ always match the data behind them. The heavy runs that produce those results are
     python src\aerovigil\stealth\adaptive.py --summarise       (Step D, exam)
     python src\aerovigil\stealth\whitebox.py                   (Step D, ~2 h)
     python src\aerovigil\stealth\harden.py --model <name>      (Step D, hardening)
+    python src\aerovigil\explain\run.py                        (Step E, ~30 min)
 
 Tables written to reports/tables/
     A_old_vs_new.csv           results before and after the Module 04 regeneration
@@ -29,6 +30,8 @@ Tables written to reports/tables/
     D_whitebox.csv             white-box worst case
     D_hardening.csv            random forest and supervised LSTM before / after hardening
     reports/figures/stealth/   D1-D3 figures
+    E_*.csv                    alarm reasons, example messages, SHAP, K-Means
+    reports/figures/explain/   E1-E2 figures
 
 Usage:
     python src\aerovigil\evaluation\run_all.py
@@ -130,6 +133,15 @@ def stealth():
     figures.run()
 
 
+def explain():
+    """Step E: reason tables, clustering and figures from the saved alarm file."""
+    from aerovigil.explain import reasons
+    from aerovigil.explain import run as explain_run
+
+    if (reasons.OUT / "alarms.csv").is_file():
+        explain_run.summarise(with_shap=False)  # SHAP table is reused, not recomputed
+
+
 def combine(cls, phy, lst):
     """Every detector on one table, the same columns, unseen missions first."""
     parts = []
@@ -188,6 +200,7 @@ def run():
 
     threat_model.run()
     stealth()
+    explain()
     print(f"\nAll tables rebuilt in {time.time() - started:.0f} s -> {TABLES}")
     return combined
 

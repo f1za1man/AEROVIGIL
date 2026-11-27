@@ -15,6 +15,10 @@ always match the data behind them. The heavy runs that produce those results are
     python src\aerovigil\stealth\whitebox.py                   (Step D, ~2 h)
     python src\aerovigil\stealth\harden.py --model <name>      (Step D, hardening)
     python src\aerovigil\explain\run.py                        (Step E, ~30 min)
+    python src\aerovigil\edge\benchmark.py                     (Step F, ~30 min;
+                                                                its F_*.csv tables are
+                                                                timings, so it writes
+                                                                them itself)
 
 Tables written to reports/tables/
     A_old_vs_new.csv           results before and after the Module 04 regeneration
@@ -32,6 +36,7 @@ Tables written to reports/tables/
     reports/figures/stealth/   D1-D3 figures
     E_*.csv                    alarm reasons, example messages, SHAP, K-Means
     reports/figures/explain/   E1-E2 figures
+    F_*.csv                    edge benchmark: size, one-thread latency, int8, streaming
 
 Usage:
     python src\aerovigil\evaluation\run_all.py

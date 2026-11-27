@@ -271,6 +271,18 @@ def evaluate_seed(name, params, sets, cols, hours, protocol, held, seed):
         clean_pool(name, params, tr, clean_va, final, cols, seed)
     )
     so, ss = score(name, final, o_test, cols), score(name, final, s_test, cols)
+    return evaluate_scores(name, params, sets, so, ss, (thr, pool_h, allowed), hours,
+                           protocol, held, seed)  # fmt: skip
+
+
+def evaluate_scores(name, params, sets, so, ss, calibration, hours, protocol, held,
+                    seed):  # fmt: skip
+    """Window metrics and per-flight verdicts from the test scores of one model:
+    so on the original test windows, ss on the synthetic ones; calibration is
+    (threshold, pool hours, allowed alarms). Step F calls this with the scores of an
+    exported model."""
+    _, _, _, o_test, s_test = sets
+    thr, pool_h, allowed = calibration
     proto = protocol_name(protocol, held)
     lab = (o_test[Y] >= 0).to_numpy()
     win = {"protocol": proto, "model": name, "seed": seed,

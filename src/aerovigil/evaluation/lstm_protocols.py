@@ -251,43 +251,57 @@ def latch(meta, score, test, thr, hours):
     return pd.DataFrame(rows)
 
 
+def flight_hours():
+    """Monitored hours of every original flight (Module 10's timestamp hours)."""
+    return pd.read_csv(SIGNALS_INDEX).set_index("flight_id")["vel_hours"].to_dict()
+
+
+def evaluate_job(job, score, meta, fold_of, hours, threshold=None):
+    """(per-flight frame, window record) for one job's scores on every window.
+
+    The threshold is calibrated on the job's calibration windows unless one is given
+    (Step F uses that to keep a full-precision threshold for a quantised model)."""
+    _, _, cal, test = masks(meta, job, fold_of)
+    thr, cal_h, allowed = threshold_for(score[cal])
+    if threshold is not None:
+        thr = float(threshold)
+    f = latch(meta, score, test, thr, hours)
+    if job["protocol"] == "type":  # scored on the held-out family only
+        f = f[(f["attack_type"] == job["held"]) | ~f["attacked"]]
+    meta_cols = {k: job[k] for k in ("name", "kind", "protocol", "held",
+                                     "hidden", "layers", "seed")}  # fmt: skip
+    f = f.assign(**meta_cols, threshold=thr)
+    lab = (
+        test & (meta["origin"] == "orig").to_numpy() & (meta["y_event"] >= 0).to_numpy()
+    )
+    w = {**meta_cols, "threshold": thr, "calibration_hours": cal_h,
+         "calibration_alarms": allowed}  # fmt: skip
+    if job["protocol"] != "cvfa":
+        w.update(window_metrics(meta["y_event"].to_numpy()[lab], score[lab], thr))
+        neg = score[lab & (meta["y_event"] == 0).to_numpy()]
+        for mode in ("position_only", "consistent"):
+            pos = test & (
+                (meta["origin"] == "syn") & (meta["attack_set"] == "main")
+                & (meta["y_event"] == 1) & (meta["velocity_mode"] == mode)
+                & (meta["attack_type"] != "abrupt_jump")
+            ).to_numpy()  # fmt: skip
+            if job["protocol"] == "type":
+                pos &= (meta["attack_type"] == job["held"]).to_numpy()
+            y = np.r_[np.ones(pos.sum()), np.zeros(len(neg))]
+            w[f"auc_syn_{mode}"] = roc_auc(y, np.r_[score[pos], neg])
+    return f, w
+
+
 def evaluate(jobs, meta, fold_of):
     sdir = PDIR / "scores"
-    hours = pd.read_csv(SIGNALS_INDEX).set_index("flight_id")["vel_hours"].to_dict()
+    hours = flight_hours()
     flights, windows = [], []
     for _, job in jobs.iterrows():
         path = sdir / f"{job['name']}.npy"
         if not path.is_file():
             continue
-        score = np.load(path)
-        _, _, cal, test = masks(meta, job, fold_of)
-        thr, cal_h, allowed = threshold_for(score[cal])
-        f = latch(meta, score, test, thr, hours)
-        if job["protocol"] == "type":  # scored on the held-out family only
-            f = f[(f["attack_type"] == job["held"]) | ~f["attacked"]]
-        meta_cols = {k: job[k] for k in ("name", "kind", "protocol", "held",
-                                         "hidden", "layers", "seed")}  # fmt: skip
-        flights.append(f.assign(**meta_cols, threshold=thr))
-        lab = (
-            test
-            & (meta["origin"] == "orig").to_numpy()
-            & (meta["y_event"] >= 0).to_numpy()
-        )
-        w = {**meta_cols, "threshold": thr, "calibration_hours": cal_h,
-             "calibration_alarms": allowed}  # fmt: skip
-        if job["protocol"] != "cvfa":
-            w.update(window_metrics(meta["y_event"].to_numpy()[lab], score[lab], thr))
-            neg = score[lab & (meta["y_event"] == 0).to_numpy()]
-            for mode in ("position_only", "consistent"):
-                pos = test & (
-                    (meta["origin"] == "syn") & (meta["attack_set"] == "main")
-                    & (meta["y_event"] == 1) & (meta["velocity_mode"] == mode)
-                    & (meta["attack_type"] != "abrupt_jump")
-                ).to_numpy()  # fmt: skip
-                if job["protocol"] == "type":
-                    pos &= (meta["attack_type"] == job["held"]).to_numpy()
-                y = np.r_[np.ones(pos.sum()), np.zeros(len(neg))]
-                w[f"auc_syn_{mode}"] = roc_auc(y, np.r_[score[pos], neg])
+        f, w = evaluate_job(job, np.load(path), meta, fold_of, hours)
+        flights.append(f)
         windows.append(w)
     flights = pd.concat(flights, ignore_index=True)
     windows = pd.DataFrame(windows)

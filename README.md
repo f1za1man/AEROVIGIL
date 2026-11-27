@@ -34,7 +34,7 @@ not redistributed in this repository.
 | 09 | Consistency detector (GPS velocity vs IMU, course vs heading) |
 | 10 | Fused detector, cross-validated false alarms, threat-model table |
 | Evaluation | One metrics module and protocol set for every detector: seen missions, unseen missions, unseen attack types, cross-validated false alarms, 5 seeds, ablations |
-| Stealth | Stealth Frontier, adaptive and white-box attacks on every detector, adversarial hardening (in progress) |
+| Stealth | Stealth Frontier, adaptive (black-box) and white-box attacks on every detector, adversarial hardening |
 
 Every alarm rate in the project uses the same budget: **1 false alarm per flight-hour**,
 with time taken from the log timestamps, a 10 s refractory period, and a Poisson 95%
@@ -63,11 +63,27 @@ unseen-mission false alarms sharply (random forest 22 → 0.84/h, logistic regre
 **Cross-validated false alarms (all 144 normal flights).** Every detector stays within
 0–1.33 alarms per flight-hour; the fused detector's 95% upper bound is 2.50/h.
 
-**Smooth, velocity-consistent drift.** The physics detectors catch slow drifts
-(≤ 0.5 m/s) on only about 10% of flights, and Module 08's adaptive attacker can move
-the drone hundreds of metres before the chi-square test alarms. How the learned models
-fare against the same drifts and against an attacker that targets them is being
-measured in the Stealth Frontier stage.
+**Stealth Frontier (our own metric): how far can an attacker move the drone before
+the first alarm?** Attacks are smooth, velocity-consistent drifts at 0.05–5 m/s,
+from three attackers: a fixed drift, a black-box adaptive attacker that reshapes the
+drift using only alarms (practises on validation flights, tested on 21 unseen test
+flights), and a white-box attacker that knows the detector, its threshold and the
+flight. Figures in `reports/figures/stealth/`, tables `reports/tables/D_*.csv`.
+
+- The adaptive and white-box attackers beat every physics detector at every speed:
+  the drone is moved up to several hundred metres without an alarm (the white-box
+  attacker hides a ~6 m/s drift from the Kalman test, ~510 m).
+- The random forest, on missions it was trained on, catches 70% of adaptive attacks
+  at 0.25 m/s and 95–100% from 0.5 m/s, with the drone moved no more than about
+  10 m; even the white-box attacker is caught on 81–90% of flights from 1 m/s. The
+  cue is measurable: a drift shifts the GPS course away from the vehicle heading, and
+  5 s window statistics pick it up where single-sample checks cannot.
+- Adversarial hardening (retraining on the attacker's best flights, recalibrated at
+  the same budget) leaves the random forest unchanged and halves the distance an
+  adaptive attacker gets past the supervised LSTM (32–38 m to 16–22 m), at the cost of
+  more false alarms on the test flights (1.1 to 2.9 per hour, on 45 minutes of flight).
+- Trade-off: the learned models' advantage holds on seen missions only; on an unseen
+  mission their false alarms break the budget (see above).
 
 ## Limitations
 

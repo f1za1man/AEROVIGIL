@@ -1,0 +1,9 @@
+detector,flights_compared,agreement,only_here,only_stepC,late_only,ok
+consistency,390,1.0,0,0,0,True
+cusum,390,1.0,0,0,0,True
+fused,390,1.0,0,0,0,True
+kalman,390,1.0,0,0,0,True
+lstm_ae,1950,1.0,0,0,147,True
+lstm_supervised,1950,1.0,0,0,121,True
+random_forest,1215,1.0,0,0,63,True
+velocity,390,1.0,0,0,0,True

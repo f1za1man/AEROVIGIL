@@ -53,7 +53,7 @@ function Invoke-Data {
     Invoke-Py "src\aerovigil\attacks\generate_v2.py"
     Invoke-Py "src\aerovigil\attacks\features_v2_m04.py"
     Invoke-Py "src\aerovigil\attacks\attack_separability.py"
-    Invoke-Py "src\aerovigil\baselines\build_window_tables_v2.py" --sources orig,syn
+    Invoke-Py "src\aerovigil\baselines\build_window_tables_v2.py" --sources "orig,syn"
     Invoke-Py "src\aerovigil\lstm\build_sequences_v2.py"
 }
 

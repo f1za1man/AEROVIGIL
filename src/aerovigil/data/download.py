@@ -2,8 +2,8 @@ r"""Download the UAV GPS-spoofing dataset (Anthony Finn) into data/raw.
 
 The dataset is not redistributed with AEROVIGIL: its repository
 (https://github.com/anthony-finn/UAV-GPS-Spoofing-Dataset) carries no licence, so the
-default is "all rights reserved", and the author gave permission for non-commercial
-academic use only (see docs/datasets/data_card.md). This script fetches the author's
+default is "all rights reserved"; AEROVIGIL uses it for non-commercial academic
+research only (see docs/datasets/data_card.md). This script fetches the author's
 own archive from the link in that repository's README, checks it is byte-for-byte the
 archive the project was built on (SHA-256), and unpacks it.
 

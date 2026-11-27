@@ -18,10 +18,11 @@
   27 November 2026: `"license": null`). Without a licence the default is that all
   rights are reserved, so the data is **not redistributed** through the AEROVIGIL
   repository; the download script fetches it from the author's own link.
-- The dataset author gave permission for non-commercial academic research use.
-- Permission given: requested via LinkedIn, awaiting reply
-- The author's reply is retained locally as project documentation and is not published
-  in the repository.
+- The dataset is publicly available from the author's repository. AEROVIGIL uses it
+  for non-commercial academic research only, cites the author and the paper, and does
+  not redistribute it.
+- Permission: requested from the author via LinkedIn; no reply yet (27 November 2026).
+  Any reply will be kept locally as project documentation, not published here.
 
 ## 3. What is in it
 

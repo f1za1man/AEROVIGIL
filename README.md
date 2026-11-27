@@ -69,8 +69,9 @@ PX4 SITL + Gazebo UAV GPS-spoofing dataset by Anthony Finn
 Flights are split by flight (seed 42): 252 train, 54 validation, 54 test; a synthetic
 attack always stays in the split of the flight it was made from.
 
-The dataset is **not redistributed** here: its repository has no licence, and the
-author's permission covers non-commercial academic use. `make download` fetches the
+The dataset is **not redistributed** here: its repository has no licence (so copyright
+stays with the author), and it is used for non-commercial academic research only; the
+author has been asked for permission. `make download` fetches the
 author's own archive and checks its SHA-256. Details: [data card](docs/datasets/data_card.md);
 the detectors' intended use and limits: [model card](docs/MODEL_CARD.md).
 
@@ -181,8 +182,9 @@ The project studies attacks in order to defend against them, and keeps to that:
   replays a GNSS signal, and nothing interacts with a real receiver or aircraft.
 - The adaptive and white-box attackers only reshape a position offset added to a log
   file; they are tools for measuring detectors, published with the defences they test.
-- The dataset is used under its author's permission for non-commercial academic
-  research and is not redistributed.
+- The dataset is publicly available from its author and is used for non-commercial
+  academic research only, cited, and not redistributed (permission has been requested
+  from the author).
 - Results are reported with their limits: no claim of state-of-the-art performance and
   no claim of real-world validation.
 

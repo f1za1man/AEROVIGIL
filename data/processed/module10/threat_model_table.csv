@@ -5,7 +5,7 @@ Dataset's own attacks (simulator),33,100%   1.5s,100%   0.4s,100%   2.7s,100%   
 Consistent drift 0.05-0.1 m/s,42,n/a,  5%  65.0s,  5% 135.8s,  0%    - ,  0%    - , 10%  68.1s,  0%    - ,  5%  65.1s
 Consistent drift 0.25 m/s,21,n/a,  5%  65.0s,  5% 135.8s,  8%  17.8s,  0%    - , 10%  68.1s,  0%    - ,  5%  65.1s
 Consistent drift 0.5-5 m/s,84,n/a, 76%   0.3s, 35%   3.2s, 81%   3.5s,  0%    - , 77%   0.3s,  0%    - , 76%   0.3s
-"Adaptive, speed-limited 0.05-5 m/s",147,n/a,  8%    - ,n/a,n/a,n/a, 12%  65.1s,  0%    - ,  8%  65.1s
-"Adaptive, no speed limit",21,n/a, 43%  17.6s,n/a,n/a,n/a, 71%  11.0s,  0%    - , 43%  17.7s
+"Adaptive, speed-limited 0.05-5 m/s",147,n/a, 11%    - ,n/a,n/a,n/a, 19%  16.9s,  0%    - , 11%  41.3s
+"Adaptive, no speed limit",21,n/a, 43%  18.3s,n/a,n/a,n/a, 57%  18.7s,  0%    - , 43%  18.4s
 "False alarms/h, normal test flights",21,0.00/h,1.58/h,1.33/h,1.33/h,1.33/h,3.17/h,1.33/h,1.33/h
 "False alarms/h, cross-validated",144,n/a,n/a,n/a,n/a,n/a,1.13/h,0.95/h,1.33/h

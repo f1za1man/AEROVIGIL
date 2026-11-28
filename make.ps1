@@ -30,8 +30,13 @@ $Detectors = @("kalman", "velocity", "fused", "cusum", "consistency", "random_fo
 function Invoke-Py {
     param([Parameter(ValueFromRemainingArguments = $true)][string[]]$PyArgs)
     Write-Output ">> python $($PyArgs -join ' ')"
+    # warnings that Python prints to stderr (e.g. ONNX Runtime's) must not stop the
+    # run when the output is redirected to a file: only the exit code decides
+    $ErrorActionPreference = "Continue"
     & $Py @PyArgs
-    if ($LASTEXITCODE -ne 0) { throw "failed: python $($PyArgs -join ' ')" }
+    $code = $LASTEXITCODE
+    $ErrorActionPreference = "Stop"
+    if ($code -ne 0) { throw "failed: python $($PyArgs -join ' ')" }
 }
 
 function Invoke-Download { Invoke-Py "src\aerovigil\data\download.py" }

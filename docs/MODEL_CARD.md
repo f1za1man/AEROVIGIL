@@ -72,12 +72,16 @@ alarm.
   metres. At 0.5 m/s the adaptive attacker gets past the Kalman test on 90% of flights
   (42 m moved).
 - **Random forest** catches 95-100% of adaptive attacks from 0.5 m/s with the drone
-  moved about 5-10 m (70% at 0.25 m/s), and 81-90% of white-box attacks from 1 m/s,
+  moved about 5-10 m (70% at 0.25 m/s), and 86-95% of white-box attacks from 1 m/s,
   **on missions it was trained on only**. On an unseen mission its false alarms rise
   to 22 per hour.
 - **LSTMs** sit in between (supervised LSTM: 34% at 0.5 m/s, 37 m). Adversarial
-  hardening halves the supervised LSTM's distance (32-38 m to 16-22 m) but raises its
-  test false alarms from 1.1 to 2.9 per hour.
+  hardening (retraining on the attacks that got through, then letting the attacker
+  search again) helps only at slow speeds: at 0.5 m/s the supervised LSTM catches 90%
+  instead of 34% (11 m instead of 37 m moved), but at 1-2 m/s the new attacker gets
+  as far as before or further (24-63 m), and its test false alarms rise from 1.1 to
+  1.6 per hour. The random forest gains a little at 0.1-0.25 m/s (47% and 90% instead
+  of 21% and 70%) for false alarms 0.8 to 1.3 per hour.
 
 Stopping a careful spoofer reliably needs a measurement the GPS cannot fake together
 with the IMU: a second GNSS antenna, an airspeed sensor or a downward camera.
@@ -94,6 +98,8 @@ with the IMU: a second GNSS antenna, an airspeed sensor or a downward camera.
 | Kalman filter, streaming | - | 164 us per 0.1 s tick | identical alarms to the batch code |
 
 Source: `reports/tables/F_*.csv`, CPU and versions in `data/processed/edge/run_info.json`.
+Times are medians on an otherwise idle laptop; repeat runs agree within about 10% for
+the models, and anything else running (a virus scan, a browser) slows them down.
 
 ## 7. After an alarm
 

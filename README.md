@@ -106,7 +106,7 @@ What the results say:
 - **Careful attackers beat the physics detectors.** A smooth drift that also fakes the
   GPS velocity, reshaped by an adaptive or white-box attacker, moves the drone
   hundreds of metres past every physics detector (the white-box attacker hides about
-  6 m/s from the Kalman test, about 510 m).
+  8 m/s from the Kalman test, about 700 m).
 - **Window statistics see what single samples cannot.** The random forest catches
   95–100% of adaptive attacks from 0.5 m/s with the drone moved about 5–10 m, because
   a drift turns the GPS course away from where the drone points, and 5 s window
@@ -162,8 +162,12 @@ Training runs are tracked with MLflow in `mlflow.db`:
 
 - **Simulation only.** No result has been validated on a real drone or a real GNSS
   signal.
-- **Open-loop synthetic attacks.** Synthetic drifts are added to recorded logs; a real
-  spoofed drone would react to the false position, which may change what detectors see.
+- **Open-loop, log-level synthetic attacks.** Synthetic drifts are added to the GPS
+  fields of recorded logs; a real spoofed drone would react to the false position,
+  which may change what detectors see.
+- **No radio-level validation.** No attack is made at the signal level, so receiver
+  checks (signal power, clock jumps, several satellite systems) are neither used nor
+  tested.
 - **The learned models' advantage holds on seen missions only.** On an unseen mission
   their false alarms break the budget.
 - **What nothing here stops:** a smooth, velocity-consistent drift below about 0.5 m/s
@@ -173,6 +177,14 @@ Training runs are tracked with MLflow in `mlflow.db`:
 - **Small false-alarm samples.** Seen-protocol rates rest on 45 minutes of normal test
   flight; the cross-validated rates (5.25 h) are the ones to quote.
 - **Dead reckoning only buys time.** It drifts past 25 m within about 30 s.
+- **Hardening is a trade.** Retraining on the attacks that got through helps the learned
+  models at slow drift speeds but costs extra false alarms, and a fresh attacker search
+  still gets past the supervised LSTM at 1-2 m/s.
+- **Label caveats.** 41 synthetic attacks never move the GPS more than 2 m but still
+  count as attacks; an abrupt jump cannot be velocity-consistent, so in that mode it
+  keeps a short eased switch-on; the Kalman test's ~10% "detection" of very slow drifts
+  (0.05-0.5 m/s) is two flights alarming at the same moment whatever the speed, so it
+  is chance, not detection.
 
 ## Ethics
 

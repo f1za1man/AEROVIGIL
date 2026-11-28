@@ -1,12 +1,12 @@
 name,kind,protocol,held,hidden,layers,seed,n_train,n_val,best_epoch,best_val
 ae_seen_s42,ae,seen,,32,1,42,2334,937,39,0.6048985123634338
-clf_seen_s42,clf,seen,,32,1,42,7481,2871,15,0.2304720708413308
 ae_mission-curved_s42,ae,mission,curved,32,1,42,1275,501,39,0.788837194442749
 ae_mission-random_s42,ae,mission,random,32,1,42,1236,503,39,0.5630521774291992
 ae_mission-straight_s42,ae,mission,straight,32,1,42,2157,870,39,0.5797762870788574
 ae_size-h64l1_s42,ae,size,,64,1,42,2334,937,39,0.5447632074356079
 ae_size-h32l2_s42,ae,size,,32,2,42,2334,937,39,0.6264381408691406
 ae_size-h64l2_s42,ae,size,,64,2,42,2334,937,39,0.6209102272987366
+clf_seen_s42,clf,seen,,32,1,42,7481,2871,15,0.23047207084133084
 clf_mission-curved_s42,clf,mission,curved,32,1,42,4834,1878,14,0.21810417443799515
 clf_mission-random_s42,clf,mission,random,32,1,42,3644,1350,20,0.22653083467925036
 clf_mission-straight_s42,clf,mission,straight,32,1,42,6484,2514,9,0.2532253577155354

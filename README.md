@@ -92,11 +92,12 @@ All numbers are on held-out test flights. Full tables: `reports/tables/`.
 over all 144 normal flights (5.25 h) every detector stays at 0–1.33 per hour. Learned
 models are the mean of 5 seeds.
 
-![Stealth Frontier](reports/figures/stealth/D1_stealth_frontier.png)
+![Stealth Frontier](reports/figures/final/M8_stealth_frontier.png)
 
 *The Stealth Frontier: median metres the drone is moved before the first alarm, against
-the attacker's mean drift speed, for a fixed drift, the adaptive attacker and the
-white-box attacker (the dashed line is the whole drift: never caught).*
+the attacker's mean drift speed, per detector: grey dashed = fixed drift, detector colour
+= adaptive attacker, black dotted = white-box attacker, thin dotted = the whole drift
+(never caught). All 51 final figures: [FIGURES.md](reports/figures/final/FIGURES.md).*
 
 What the results say:
 
@@ -151,7 +152,7 @@ macOS, `make <target>` runs the same targets.
 | `train` | every detector trained and calibrated (M5–M10) | ~1 h |
 | `eval` | protocols, Stealth Frontier, explanations, edge, fallback, all tables | ~15 h |
 | `tables` | rebuild every results table from saved results | ~1 min |
-| `figures` | redraw the Stealth Frontier and fallback figures | ~1 min |
+| `figures` | every final figure (51) and [FIGURES.md](reports/figures/final/FIGURES.md) | ~4 min |
 | `test` | black, ruff, pytest | ~6 min |
 | `demo` | open the offline dashboard (builds its data the first time, ~7 min) | |
 
@@ -207,7 +208,7 @@ The project studies attacks in order to defend against them, and keeps to that:
 - `data/` dataset and intermediate results (the dataset and large files are not
   committed)
 - `docs/` data card, model card, technical notes per module
-- `reports/` result tables and figures
+- `reports/` result tables and figures (all final figures, with captions and sources, in [reports/figures/final/FIGURES.md](reports/figures/final/FIGURES.md))
 - `src/aerovigil/` source code, one package per module
 - `tests/` automated tests (tests that need the dataset skip without it)
 - `Makefile`, `make.ps1` one-command targets

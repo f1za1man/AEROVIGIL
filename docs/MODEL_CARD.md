@@ -62,8 +62,8 @@ the one to quote.
 
 ## 5. The attacker it cannot detect
 
-Measured with the Stealth Frontier (`reports/tables/D_*.csv`, figures in
-`reports/figures/stealth/`): the median distance the drone is moved before the first
+Measured with the Stealth Frontier (`reports/tables/D_*.csv`, figures
+`reports/figures/final/M8_*.png`): the median distance the drone is moved before the first
 alarm.
 
 - **Physics detectors** do not stop a smooth drift that also fakes the GPS velocity

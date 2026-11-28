@@ -9,7 +9,7 @@ Usage (from the repo folder, in PowerShell):
     .\make.ps1 eval        Steps B-G: protocols, Stealth Frontier, explanations, edge,
                            fallback, then every table (~15 h)
     .\make.ps1 tables      rebuild every results table from saved results (minutes)
-    .\make.ps1 figures     redraw the Stealth Frontier and fallback figures
+    .\make.ps1 figures     every final figure + FIGURES.md (reports/figures/final, ~3 min)
     .\make.ps1 test        black, ruff and pytest
     .\make.ps1 smoke       tests plus tables and headline figure (works on a fresh clone)
     .\make.ps1 demo        open the offline demo dashboard (builds its data the first time)
@@ -95,6 +95,7 @@ function Invoke-Tables { Invoke-Py "src\aerovigil\evaluation\run_all.py" }
 function Invoke-Figures {
     Invoke-Py "src\aerovigil\stealth\figures.py"
     Invoke-Py "src\aerovigil\mitigation\run.py" --figures
+    Invoke-Py "src\aerovigil\evaluation\make_figures.py"
 }
 
 function Invoke-Test {

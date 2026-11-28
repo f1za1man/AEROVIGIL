@@ -12,7 +12,7 @@ help:
 	@echo "make eval        Steps B-G: protocols, Stealth Frontier, explanations, edge,"
 	@echo "                 fallback, then every table (~15 h)"
 	@echo "make tables      rebuild every results table from saved results (minutes)"
-	@echo "make figures     redraw the Stealth Frontier and fallback figures"
+	@echo "make figures     every final figure + FIGURES.md (reports/figures/final, ~3 min)"
 	@echo "make test        black, ruff and pytest"
 	@echo "make smoke       tests plus tables and headline figure from a fresh clone"
 	@echo "make demo        open the offline demo dashboard (builds its data the first time)"
@@ -80,6 +80,7 @@ tables:
 figures:
 	$(PY) src/aerovigil/stealth/figures.py
 	$(PY) src/aerovigil/mitigation/run.py --figures
+	$(PY) src/aerovigil/evaluation/make_figures.py
 
 test:
 	$(PY) -m black --check --line-length 88 src/aerovigil tests app
